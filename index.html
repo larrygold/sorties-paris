@@ -170,6 +170,9 @@ form.panel h3{margin:0;font-size:16px}
 .price .pc{color:var(--muted);font-size:12px}
 .legend{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .panel.veille{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:10px 0}.veille h3{margin:0 0 6px}
+#meteo{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:0 0 12px}
+.meteo-line{display:flex;gap:10px;align-items:center}.meteo-line .ico{font-size:1.6em;line-height:1}
+.meteo-tip{margin:8px 0 4px;font-size:.92em}.meteo-list{margin:4px 0 0;padding-left:0;list-style:none;font-size:.9em;line-height:1.5}.meteo-list a{color:inherit}
 .veille details{margin-top:8px}.veille summary{cursor:pointer;font-weight:600}
 .mdsrc{font-size:.9em;line-height:1.45;overflow-wrap:anywhere}.mdsrc h4{margin:14px 0 4px}.mdsrc h4.md3{font-size:.95em}.mdsrc ul{margin:4px 0;padding-left:18px}.mdsrc p{margin:6px 0}.mdsrc code{font-size:.85em;background:var(--paper);padding:0 3px;border-radius:4px}
 </style>
@@ -213,6 +216,7 @@ form.panel h3{margin:0;font-size:16px}
         <div class="legend" id="legend"></div>
       </div>
 
+      <div id="meteo" hidden></div>
       <div class="summary"><strong id="count"></strong><button class="reset" id="reset">Réinitialiser</button></div>
       <div id="out"></div>
     </section>
@@ -273,9 +277,10 @@ Mention « (à confirmer) » : la page n'a pas encore été vérifiée. La veill
 1. Ouvrir la page « Agenda » du lieu. Si elle ne se charge pas, essayer « Aussi ».
 2. En secours, chercher sur le web : `<nom du lieu> agenda <mois> <année>`. Les pages paris.fr/evenements, 75.agendaculturel.fr, unidivers.fr et agenda.parisjetaime.com donnent souvent la date, l'heure et le prix.
 3. Ne garder que ce qui a lieu dans Paris intra-muros. Les conférences doivent rester accessibles, pas trop techniques (modèle : les Lundis Philo de Charles Pépin).
-4. Noter les vrais horaires. Pour un cycle ou une pièce, noter les jours de la semaine et leurs heures (champ `sched`). Pour un marché, un festival ou une expo ouvert tous les jours, mettre `"daily":true`, ou un `sched` avec les horaires. Si les jours ne sont pas connus, ne mettre ni `sched` ni `daily` : l'événement va dans « Dates inconnues » et n'est rattaché à aucune date.
-5. Indiquer l'état des places quand la billetterie l'affiche, et retirer ce qui est complet.
-6. Chaque semaine, revérifier les événements à venir déjà dans l'agenda : places, horaire, prix, annulation. Les corrections vont dans `weekly-data.patch`, sous la clé `"AAAA-MM-JJ|Titre exact"`, par exemple {"st":"ok"}, {"t":"19:00","end":"20:30"}, {"price":"12 €"}, {"st":"complet"} (l'événement disparaît) ou {"cancel":true}. Les clés des événements passés sont supprimées.
+4. Noter les vrais horaires. Pour un cycle ou une pièce, noter les jours de la semaine et leurs heures (champ `sched`). Pour un marché, un festival ou une expo ouvert tous les jours, mettre `"daily":true`, ou un `sched` avec les horaires. Si les jours ne sont pas connus, ne mettre ni `sched` ni `daily` : l'événement va dans « Dates inconnues » et n'est rattaché à aucune date. Si la date annoncée n'est pas certaine, ajouter `"tbc":true` : l'événement va dans « Dates inconnues ou à confirmer ». Ce qui est ouvert tous les jours ou presque (au moins 5 jours par semaine) s'affiche dans la section « Tous les jours ».
+5. Marquer `"outdoor":true` ce qui se passe en plein air (marchés, illuminations, balades guidées, fêtes de quartier, expositions en extérieur…). Les jours de beau temps, l'appli met ces sorties en avant ; en chercher activement, surtout parmi les événements exceptionnels.
+6. Indiquer l'état des places quand la billetterie l'affiche, et retirer ce qui est complet.
+7. Chaque semaine, revérifier les événements à venir déjà dans l'agenda : places, horaire, prix, annulation. Les corrections vont dans `weekly-data.patch`, sous la clé `"AAAA-MM-JJ|Titre exact"`, par exemple {"st":"ok"}, {"t":"19:00","end":"20:30"}, {"price":"12 €"}, {"st":"complet"} (l'événement disparaît) ou {"cancel":true}. Les clés des événements passés sont supprimées.
 
 ## Sources transversales
 
@@ -472,6 +477,7 @@ Si une nouvelle suggestion est acceptée ou si un lieu est ajouté dans l'appli,
 const PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
 
 /* la date du jour vient de l'appareil (heure de Paris), à chaque ouverture de la page */
+const nowHM = () => { try{ return new Intl.DateTimeFormat("fr-FR",{timeZone:"Europe/Paris",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(new Date()); }catch(_){ const d=new Date(); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); } };
 const TODAY = (()=>{ try{ return new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()); }catch(_){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); } })();
 
 const TYPES = [
@@ -606,10 +612,10 @@ const BASE_EVENTS = [
 /* Événements exceptionnels : festivals, sommets, anniversaires, éditions spéciales. */
 const EXC_EVENTS = [
   {d:"2026-11-12", dEnd:"2026-11-15", t:"13:00", end:"20:00", title:"Paris Photo", who:"29e édition, plus de 230 exposants de 30 pays", v:"gpalais", cat:"Foire d'art", th:[], price:"36 € en semaine · 41 € le week-end · réduit 15 €", st:"unknown", url:"https://www.visitparisregion.com/fr/paris-photo", desc:"La grande foire mondiale de la photographie sous la verrière du Grand Palais, l'année du bicentenaire de la photo. Dimanche jusqu'à 19h."},
-  {d:"2026-11-12", dEnd:"2026-12-31", t:"", sched:{0:["10:00","21:30"],1:["11:00","21:00"],2:["11:00","21:00"],3:["11:00","21:00"],4:["11:00","21:00"],5:["11:00","23:00"],6:["10:00","23:00"]}, title:"Marché de Noël de La Défense", who:"Le plus grand marché de Noël d'Île-de-France", v:"defense", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets sur le parvis et patinoire (jusqu'au 3 janvier)."},
-  {d:"2026-11-14", dEnd:"2027-01-03", t:"", sched:{0:["11:00","23:30"],1:["11:00","23:30"],2:["11:00","23:30"],3:["11:00","23:30"],4:["11:00","23:30"],5:["11:00","23:30"],6:["11:00","23:30"]}, title:"Marché de Noël des Tuileries", who:"La Magie de Noël", v:"tuileries", cat:"Noël", th:[], price:"Entrée libre (manèges payants)", free:true, st:"libre", url:"https://www.sortiraparis.com/en/news/christmas-and-holidays/guides/34166-the-christmas-markets-to-discover-in-paris-and-ile-de-france-in-2026", desc:"Chalets, manèges et gourmandises dans le jardin des Tuileries."},
-  {d:"2026-11-22", dEnd:"2027-01-04", t:"", daily:true, title:"Retour du marché de Noël des Champs-Élysées et illuminations", who:"Après près de dix ans d'absence", v:"champs", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets en bas de l'avenue, côté Concorde ; ouverture le jour du lancement des illuminations (17h-minuit, 1h le week-end)."},
-  {d:"2026-11-26", dEnd:"2026-12-27", t:"10:00", end:"20:00", daily:true, title:"Marché de Noël de Notre-Dame", who:"Square René-Viviani", v:"notredame", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Artisans et spécialités régionales face à la cathédrale, au bord de la Seine."},
+  {d:"2026-11-12", dEnd:"2026-12-31", outdoor:true, t:"", sched:{0:["10:00","21:30"],1:["11:00","21:00"],2:["11:00","21:00"],3:["11:00","21:00"],4:["11:00","21:00"],5:["11:00","23:00"],6:["10:00","23:00"]}, title:"Marché de Noël de La Défense", who:"Le plus grand marché de Noël d'Île-de-France", v:"defense", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets sur le parvis et patinoire (jusqu'au 3 janvier)."},
+  {d:"2026-11-14", dEnd:"2027-01-03", outdoor:true, t:"", sched:{0:["11:00","23:30"],1:["11:00","23:30"],2:["11:00","23:30"],3:["11:00","23:30"],4:["11:00","23:30"],5:["11:00","23:30"],6:["11:00","23:30"]}, title:"Marché de Noël des Tuileries", who:"La Magie de Noël", v:"tuileries", cat:"Noël", th:[], price:"Entrée libre (manèges payants)", free:true, st:"libre", url:"https://www.sortiraparis.com/en/news/christmas-and-holidays/guides/34166-the-christmas-markets-to-discover-in-paris-and-ile-de-france-in-2026", desc:"Chalets, manèges et gourmandises dans le jardin des Tuileries."},
+  {d:"2026-11-22", dEnd:"2027-01-04", outdoor:true, t:"", daily:true, title:"Retour du marché de Noël des Champs-Élysées et illuminations", who:"Après près de dix ans d'absence", v:"champs", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets en bas de l'avenue, côté Concorde ; ouverture le jour du lancement des illuminations (17h-minuit, 1h le week-end)."},
+  {d:"2026-11-26", dEnd:"2026-12-27", outdoor:true, t:"10:00", end:"20:00", daily:true, title:"Marché de Noël de Notre-Dame", who:"Square René-Viviani", v:"notredame", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Artisans et spécialités régionales face à la cathédrale, au bord de la Seine."},
   {d:"2026-11-21", t:"11:30", end:"18:30", title:"Paris contre l'oligarchie internationale", who:"Sommet avec l'Observatoire international de la fiscalité, l'ICRICT et le PSE Stone Center", v:"concorde", cat:"Sommet", th:[], price:"Gratuit, sur réservation", free:true, st:"unknown", url:"https://www.paris.fr/evenements/paris-contre-l-oligarchie-internationale-126136", desc:"Richesses extrêmes, concentration du pouvoir économique, médiatique et technologique : comment y répondre ?"},
   {d:"2026-11-21", dEnd:"2026-11-22", t:"09:30", title:"L'État de droit contre l'état de guerre", who:"32e université d'automne de la LDH", v:"ldh", cat:"Rencontres", th:[], price:"Voir le site", st:"unknown", url:"https://www.paris.fr/evenements/32e-universite-d-automne-de-la-ldh-sur-le-theme-l-etat-de-droit-contre-l-etat-de-guerre-125778", desc:"Un week-end de conférences et de tables rondes sur les libertés face à la guerre et à la loi du plus fort."},
   {d:"2026-12-05", dEnd:"2026-12-06", t:"", title:"Orsay a 40 ans : le week-end anniversaire", who:"Musée d'Orsay", v:"orsay40", cat:"Anniversaire", th:[], price:"Gratuit", free:true, st:"soon", url:"https://www.musee-orsay.fr/fr/programme/agenda", desc:"Un week-end festif et gratuit pour les 40 ans du musée. Programme et réservations bientôt en ligne."}
@@ -1033,16 +1039,23 @@ const isCycle = e => e.dEnd && (parse(e.dEnd)-parse(e.d))/864e5 > 3;
 const dow = s => parse(s).getDay();
 /* sched : horaires par jour de la semaine {0:dim … 6:sam : ["début","fin"]} */
 /* période longue sans jours connus : on ne la rattache à aucune date */
-const undated = e => !!(e.dEnd && (parse(e.dEnd)-parse(e.d))/864e5 > 3 && !e.sched && !e.daily && !e.t);
+const undated = e => !!e.tbc || !!(e.dEnd && (parse(e.dEnd)-parse(e.d))/864e5 > 3 && !e.sched && !e.daily && !e.t);
+/* ouvert tous les jours (ou presque) : rangé à part, pas sous chaque date */
+const continuous = e => !undated(e) && !!e.dEnd && e.dEnd>e.d && (!!e.daily || (!!e.sched && Object.keys(e.sched).length>=5));
 const occurs = (e, day) => !undated(e) && day>=e.d && day<=(e.dEnd||e.d) && (!e.sched || e.sched[dow(day)]!==undefined);
 function firstOcc(e, from){ let s = e.d<from ? from : e.d; const end=e.dEnd||e.d; for(; s<=end; s=addDays(s,1)) if(occurs(e,s)) return s; return e.d; }
+function passedToday(e){ const now=nowHM(), tt=timeFor(e,TODAY); return continuous(e) ? !!(tt.end && tt.end<=now) : !!(tt.t && tt.t<=now); }
+/* une occurrence encore à venir ce jour-là (aujourd'hui : pas encore commencée, ou encore ouvert pour un lieu ouvert en continu) */
+const occursFrom = (e, day) => occurs(e,day) && (day>TODAY || (day===TODAY && !passedToday(e)));
+function nextOcc(e){ let s = e.d<TODAY ? TODAY : e.d; const end=e.dEnd||e.d; for(let n=0; s<=end && n<400; s=addDays(s,1), n++) if(occursFrom(e,s)) return s; return null; }
+const upcoming = e => undated(e) ? upcoming(e) : !!nextOcc(e);
 function timeFor(e, day){ if(e.sched){ const x=e.sched[dow(day||firstOcc(e,TODAY))]; return x?{t:x[0]||"",end:x[1]||""}:{t:"",end:""}; } return {t:e.t||"",end:e.end||""}; }
 const JC = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
 function schedLabel(e){
   const by={}; [1,2,3,4,5,6,0].forEach(d=>{ const x=e.sched[d]; if(x){ const k=x[0].replace(":","h"); (by[k]=by[k]||[]).push(d); } });
   return Object.entries(by).map(([h,ds])=>{ const run = ds.length>2 && ds.every((d,i)=>i===0||d===ds[i-1]+1); const lab = ds.length===1 && Object.keys(by).length===1 ? "chaque "+JOURS[ds[0]] : run ? JC[ds[0]]+"–"+JC[ds[ds.length-1]] : ds.map(d=>JC[d]).join(" "); return lab+" "+h; }).join(" · ");
 }
-const marks = (e, day) => undated(e) ? false : isCycle(e) ? day===firstOcc(e,e.d) : occurs(e, day); /* pastilles du calendrier */
+const marks = (e, day) => (undated(e) || continuous(e)) ? false : isCycle(e) ? day===firstOcc(e,e.d) : occurs(e, day); /* pastilles du calendrier */
 
 /* ---------- filtres ---------- */
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
@@ -1058,12 +1071,12 @@ function fitsHours(e){
 }
 const stOf = e => STATUS[e.st] ? e.st : "unknown";
 const visibleStatus = e => !S.unk || e.st!=="unknown" || e.mine;
-const baseMatch = e => S.types.has(e.type) && (e.dEnd||e.d)>=TODAY && visibleStatus(e)
+const baseMatch = e => S.types.has(e.type) && upcoming(e) && visibleStatus(e)
   && (!S.themes.size || e.type!=="conf" || e.th.some(t=>S.themes.has(t))) /* les thèmes filtrent les conférences */ && (!S.free || e.free) && fitsHours(e) && (S.tiers || (VENUES[e.v]||{}).kind!=="tiers");
 function match(e){
   if(!baseMatch(e)) return false;
-  if(S.day && !occurs(e,S.day)) return false;
-  if(S.week && !weekend().some(d=>occurs(e,d))) return false;
+  if(S.day && !(undated(e) ? false : occursFrom(e,S.day))) return false;
+  if(S.week && !weekend().some(d=>occursFrom(e,d))) return false;
   if(S.q){ const v=VENUES[e.v]; const hay=norm([e.title,e.who,e.desc,v.name,v.arr,...e.th.map(t=>THEMES[t].label)].join(" ")); if(!norm(S.q).split(/\s+/).every(w=>hay.includes(w))) return false; }
   return true;
 }
@@ -1102,9 +1115,9 @@ function renderCal(){
   $("q-tiers").setAttribute("aria-pressed", S.tiers);
   $("q-hours").setAttribute("aria-pressed", USER.hours.on);
   $("hours-from").value = USER.hours.from; $("hours-from").disabled = !USER.hours.on;
-  const nUnk = E.filter(e=>e.st==="unknown" && (e.dEnd||e.d)>=TODAY && !e.mine).length;
-  const nH = USER.hours.on ? E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && !fitsHours(e)).length : 0;
-  const nNoT = USER.hours.on ? E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && !fitsHours(e) && !e.t).length : 0;
+  const nUnk = E.filter(e=>e.st==="unknown" && upcoming(e) && !e.mine).length;
+  const nH = USER.hours.on ? E.filter(e=>upcoming(e) && visibleStatus(e) && !fitsHours(e)).length : 0;
+  const nNoT = USER.hours.on ? E.filter(e=>upcoming(e) && visibleStatus(e) && !fitsHours(e) && !e.t).length : 0;
   const hoursTxt = nH ? ` ${nH} en journée de semaine masquée${nH>1?"s":""}.` : "";
   $("legend").innerHTML = (S.unk ? `${nUnk} séance${nUnk>1?"s":""} aux places non vérifiées masquée${nUnk>1?"s":""}.` : `Dont ${nUnk} séance${nUnk>1?"s":""} MK2 aux places non vérifiées (étiquette en pointillés).`) + hoursTxt;
 }
@@ -1121,7 +1134,7 @@ function gcal(e){
 function card(e, day){
   const v = VENUES[e.v]; const c = THEMES[e.th[0]]?.c || "#5b6478";
   const tt = timeFor(e, typeof day==="string" ? day : null);
-  const time = tt.t ? `${tt.t.replace(":","h")}${tt.end?`<small>→ ${tt.end.replace(":","h")}</small>`:""}` : (undated(e)?`<small>date inconnue</small>`:`<small>horaire à confirmer</small>`);
+  const time = tt.t ? `${tt.t.replace(":","h")}${tt.end?`<small>→ ${tt.end.replace(":","h")}</small>`:""}` : (undated(e)?`<small>${e.tbc?"date à confirmer":"date inconnue"}</small>`:continuous(e)&&!e.sched?`<small>tous les jours</small>`:`<small>horaire à confirmer</small>`);
   const st = STATUS[stOf(e)];
   const tags = [
     isFresh(e)?`<span class="tag al-nouveau">Nouveau</span>`:"",
@@ -1157,10 +1170,11 @@ function card(e, day){
 function groupList(list){
   if(!list.length) return `<div class="empty">Aucune sortie avec ces filtres.<br>Essayez une autre date ou retirez un thème.</div>`;
   const groups = {};
-  list.forEach(e=>{ if(undated(e)){ (groups["~"]=groups["~"]||[]).push(e); return; } let k=e.d; if(e.dEnd && e.d<TODAY) k=TODAY; if(e.sched) k=firstOcc(e,TODAY); if(S.day && occurs(e,S.day)) k=S.day; else if(S.week && e.sched){ const w=weekend().find(d=>occurs(e,d)); if(w) k=w; } (groups[k]=groups[k]||[]).push(e); });
+  list.forEach(e=>{ if(undated(e)){ (groups["~2"]=groups["~2"]||[]).push(e); return; } if(continuous(e)){ (groups["~1"]=groups["~1"]||[]).push(e); return; } let k=nextOcc(e)||e.d; if(S.day && occursFrom(e,S.day)) k=S.day; else if(S.week){ const w=weekend().find(d=>occursFrom(e,d)); if(w) k=w; } (groups[k]=groups[k]||[]).push(e); });
   return Object.keys(groups).sort().map(k=>{
     const g = groups[k].sort((a,b)=>(timeFor(a,k).t||"99").localeCompare(timeFor(b,k).t||"99"));
-    if(k==="~") return `<div class="dayhead">Dates inconnues<em>${g.length}</em></div><p class="legend">Jours de séance pas encore trouvés : vérifie sur le site du lieu.</p><div class="list">${g.map(e=>card(e,null)).join("")}</div>`;
+    if(k==="~1") return `<div class="dayhead">Tous les jours (ou presque)<em>${g.length}</em></div><p class="legend">Marchés, expositions et spectacles à l'affiche en continu.</p><div class="list">${g.map(e=>card(e,S.day||(nextOcc(e)||null))).join("")}</div>`;
+    if(k==="~2") return `<div class="dayhead">Dates inconnues ou à confirmer<em>${g.length}</em></div><p class="legend">Jours de séance pas encore trouvés ou pas certains : vérifie sur le site du lieu.</p><div class="list">${g.map(e=>card(e,null)).join("")}</div>`;
     const rel = k===TODAY?"aujourd'hui":(k===addDays(TODAY,1)?"demain":"");
     return `<div class="dayhead">${longDay(k)}${rel?`<em>${rel}</em>`:""}<em>${g.length}</em></div><div class="list">${g.map(e=>card(e,k)).join("")}</div>`;
   }).join("");
@@ -1210,7 +1224,7 @@ function renderVeille(){
 function renderVenues(){
   renderVeille();
   const counts = {};
-  E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && fitsHours(e)).forEach(e=>counts[e.v]=(counts[e.v]||0)+1);
+  E.filter(e=>upcoming(e) && visibleStatus(e) && fitsHours(e)).forEach(e=>counts[e.v]=(counts[e.v]||0)+1);
   const hidden = new Set(USER.hiddenVenues);
   const ids = Object.keys(VENUES).filter(id=>!hidden.has(id));
   const active = ids.filter(id=>counts[id]||VENUES[id].mine).sort((a,b)=>(counts[b]||0)-(counts[a]||0));
@@ -1230,7 +1244,7 @@ function renderSugs(){
   const rej = SUGGESTIONS.filter(s=>USER.rejectedSugs.includes(s.id));
   let h = "";
   const sugCard = s=>{
-      const up = s.events.filter(e=>(e.dEnd||e.d)>=TODAY).sort((a,b)=>a.d.localeCompare(b.d));
+      const up = s.events.filter(e=>upcoming(e)).sort((a,b)=>a.d.localeCompare(b.d));
       return `<div class="venue sug">
         <h3>${esc(s.venue.name)} ${s.venue.arr?`<span class="arr">${esc(s.venue.arr)}</span>`:""}</h3>
         ${s.venue.kind==="festival"?`<span class="tag exc">Festival</span>`:""}
@@ -1292,9 +1306,9 @@ function renderFavs(){
 }
 
 function renderRange(){
-  const up = E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && fitsHours(e));
+  const up = E.filter(e=>upcoming(e) && visibleStatus(e) && fitsHours(e));
   if(!up.length){ $("range").textContent = "Aucune sortie"; return; }
-  const l = parse(up.map(e=>e.d).sort().pop());
+  const l = parse(up.filter(e=>!undated(e)&&!continuous(e)).map(e=>e.d).concat([TODAY]).sort().pop());
   $("range").textContent = `${up.length} sorties · dates jusqu'au ${l.getDate()} ${MOIS[l.getMonth()]}`;
 }
 
@@ -1326,7 +1340,38 @@ function renderAlerts(){
   }).join("") : `<p class="legend">Aucun artiste suivi.</p>`;
 }
 
-function all(){ renderRange(); renderChips(); renderCal(); renderList(); renderFavs(); renderAlerts(); }
+setInterval(()=>{ try{ const t=new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()); if(t!==TODAY) location.reload(); else { all(); if(S.view==="lieux") renderVenues(); } }catch(_){} }, 5*60*1000);
+/* ---------- météo du jour à Paris (Open-Meteo, gratuit, sans clé) ---------- */
+let METEO = null;
+const WMO = c => c===0?["☀️","Grand soleil"]:c<=2?["🌤️","Plutôt ensoleillé"]:c===3?["☁️","Couvert"]:c<=48?["🌫️","Brouillard"]:c<=67?["🌧️","Pluie"]:c<=77?["❄️","Neige"]:c<=82?["🌦️","Averses"]:["⛈️","Orages"];
+async function loadMeteo(){
+  try{ const c=JSON.parse(localStorage.getItem("sp-meteo")||"null"); if(c && c.day===TODAY && Date.now()-c.at<3*3600e3){ METEO=c; renderMeteo(); return; } }catch(_){}
+  try{
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.8566&longitude=2.3522&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,precipitation_probability_max&timezone=Europe%2FParis&forecast_days=1");
+    const j = await r.json();
+    METEO = {day:TODAY, at:Date.now(), code:j.daily.weather_code[0], tmax:Math.round(j.daily.temperature_2m_max[0]), rain:j.daily.precipitation_probability_max[0], now:Math.round(j.current.temperature_2m), codeNow:j.current.weather_code};
+    try{ localStorage.setItem("sp-meteo", JSON.stringify(METEO)); }catch(_){}
+    renderMeteo();
+  }catch(_){ /* pas de réseau : on n'affiche rien */ }
+}
+const niceDay = m => m && m.code<=2 && (m.rain??0) < 30 && m.tmax >= 8;
+function renderMeteo(){
+  const box=$("meteo"); if(!box || !METEO) return;
+  const [ico,lab] = WMO(METEO.code);
+  let h = `<div class="meteo-line"><span class="ico">${ico}</span><span><b>Aujourd'hui à Paris</b> · ${lab}, ${METEO.tmax}° max${METEO.rain!=null?` · pluie ${METEO.rain} %`:""}</span></div>`;
+  if(niceDay(METEO)){
+    const today = E.filter(e=>baseMatch(e) && !undated(e) && occursFrom(e,TODAY));
+    const out = today.filter(e=>e.outdoor), exc = today.filter(e=>!e.outdoor && (e.type==="exc"||e.type==="fest"));
+    const pick = [...out, ...exc].slice(0,5);
+    h += `<p class="meteo-tip">Il fait beau : ${pick.length?"profites-en pour sortir.":"rien en plein air au programme aujourd'hui, mais c'est le jour pour une balade."}</p>`;
+    if(pick.length) h += `<ul class="meteo-list">${pick.map(e=>{ const v=VENUES[e.v]||{}; const tt=timeFor(e,TODAY); return `<li><a href="${esc(safeUrl(e.url)||safeUrl(v.url)||"#")}" target="_blank" rel="noopener">${e.outdoor?"🌳 ":"★ "}<b>${esc(e.title)}</b></a> · ${esc(e.place||v.name||"")}${tt.t?` · ${tt.t.replace(":","h")}${tt.end?"–"+tt.end.replace(":","h"):""}`:""}</li>`; }).join("")}</ul>`;
+  } else {
+    h += `<p class="meteo-tip">Temps plutôt pour une sortie en salle.</p>`;
+  }
+  box.innerHTML = h; box.hidden = false;
+}
+loadMeteo();
+function all(){ renderMeteo(); renderRange(); renderChips(); renderCal(); renderList(); renderFavs(); renderAlerts(); }
   try{ if(WEEKLY.checked) $("checkdate").textContent = "le "+longDay(WEEKLY.checked)+" (mise à jour du dimanche)"; }catch(_){}
 
 /* ---------- interactions ---------- */
