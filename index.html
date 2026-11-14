@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16213b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Sorties Paris</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Plan : kiosque à journaux parisien — encre marine, papier gris froid, accent bleu de Paris, une couleur par thème.
+   Layout : une colonne mobile, en-tête collant, agenda mensuel repliable, liste groupée par jour. */
+:root{
+  --paper:#eef0f3;
+  --card:#ffffff;
+  --ink:#16213b;
+  --muted:#5b6478;
+  --line:#d8dce4;
+  --accent:#1f4fd1;
+  --accent-ink:#ffffff;
+  --warn:#b4231b;
+  --ok:#17744a;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f1424;--card:#182038;--ink:#e8ecf6;--muted:#9aa3ba;--line:#2a3452;
+    --accent:#7d9bff;--accent-ink:#0f1424;--warn:#ff8b7f;--ok:#5fd39a;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f1424;--card:#182038;--ink:#e8ecf6;--muted:#9aa3ba;--line:#2a3452;
+  --accent:#7d9bff;--accent-ink:#0f1424;--warn:#ff8b7f;--ok:#5fd39a;color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px calc(90px + env(safe-area-inset-bottom))}
+
+header.top{position:sticky;top:0;z-index:20;background:var(--paper);padding:calc(10px + env(safe-area-inset-top)) 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-stretch:75%;font-weight:800;font-size:30px;letter-spacing:-.01em;margin:0;line-height:1;text-transform:uppercase}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px}
+.search{margin-top:10px;display:flex;gap:8px}
+.search input{flex:1;min-width:0;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:10px 14px;font:inherit}
+
+.row{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted))}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip[disabled]{opacity:.45;cursor:default}
+.chip small{font-weight:500;opacity:.8}
+.label{font-family:var(--display);font-stretch:85%;text-transform:uppercase;font-size:11px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-top:12px}
+
+/* Agenda */
+.cal{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:14px}
+.calhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calhead h2{font-family:var(--display);font-stretch:80%;font-size:20px;text-transform:uppercase;margin:0;font-weight:800}
+.navbtn{border:1px solid var(--line);background:transparent;border-radius:10px;width:36px;height:36px;cursor:pointer;font-size:18px}
+.navbtn:disabled{opacity:.3;cursor:default}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.dow{text-align:center;font-size:11px;color:var(--muted);font-weight:700;padding-bottom:2px}
+.day{aspect-ratio:1/1;border:none;background:transparent;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;position:relative}
+.day.out{visibility:hidden}
+.day.past{color:var(--muted);opacity:.5}
+.day.has{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.day .n{display:flex;gap:2px;height:5px}
+.day .n i{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.day.today::after{content:"";position:absolute;inset:3px;border:1.5px solid var(--ink);border-radius:8px;pointer-events:none}
+.day[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.day[aria-pressed="true"] .n i{background:var(--accent-ink)}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* Liste */
+.summary{display:flex;justify-content:space-between;align-items:center;margin:18px 0 4px;gap:8px;flex-wrap:wrap}
+.summary strong{font-family:var(--display);font-stretch:80%;font-size:18px;text-transform:uppercase}
+.reset{border:none;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:4px 0}
+.dayhead{position:sticky;top:var(--hh,150px);z-index:5;background:var(--paper);padding:14px 0 6px;font-family:var(--display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:15px;letter-spacing:.02em;display:flex;align-items:baseline;gap:8px}
+.dayhead em{font-style:normal;color:var(--muted);font-weight:600;font-size:12px}
+.list{display:flex;flex-direction:column;gap:10px}
+.ev{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px 12px 16px;display:grid;grid-template-columns:52px 1fr;gap:12px;position:relative;overflow:hidden}
+.ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.time{font-family:var(--display);font-stretch:80%;font-weight:800;font-size:17px;font-variant-numeric:tabular-nums;line-height:1.1}
+.time small{display:block;font-family:var(--body);font-weight:500;font-size:11px;color:var(--muted);font-stretch:100%}
+.ev h3{margin:0 0 2px;font-size:16px;line-height:1.25;text-wrap:balance}
+.who{color:var(--muted);font-size:13.5px}
+.where{font-size:13.5px;margin-top:6px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.where b{font-weight:600}
+.arr{font-variant-numeric:tabular-nums;font-size:12px;font-weight:700;background:var(--paper);border-radius:6px;padding:1px 6px}
+.desc{font-size:13.5px;margin:6px 0 0;color:var(--ink)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 7px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--ink)}
+.tag.free{--c:var(--ok)}
+.tag.full{background:var(--warn);color:#fff}
+.tag.plain{background:var(--paper)}
+.acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 11px;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn[aria-pressed="true"]{color:var(--warn);border-color:var(--warn)}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:24px;text-align:center;color:var(--muted)}
+
+/* Lieux */
+.venue{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.venue h3{margin:0;font-size:16px}
+.venue p{margin:4px 0 0;font-size:13.5px;color:var(--muted)}
+.venue .acts{margin-top:10px}
+.section-title{font-family:var(--display);font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:18px;margin:22px 0 8px}
+.note{font-size:12.5px;color:var(--muted);margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+
+/* Barre d'onglets */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+nav.tabs .in{display:flex;max-width:720px;width:100%}
+nav.tabs button{flex:1;border:none;background:none;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:700;color:var(--muted);cursor:pointer}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected="true"]{color:var(--accent)}
+.badge{background:var(--warn);color:#fff;border-radius:999px;font-size:10px;padding:0 5px;margin-left:2px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:no-preference){.ev{animation:in .25s ease both}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+
+/* Statut des places */
+.tag.st-ok{background:var(--ok);color:#fff}
+.tag.st-libre{--c:var(--ok)}
+.tag.st-soon{--c:#b45309}
+.tag.exc{--c:#a16207;font-weight:700}
+.alshow{border-top:1px solid var(--line);padding:10px 0}
+.alshow:first-of-type{border-top:none}
+.alshow h4{margin:0 0 4px;font-size:15px}
+.alshow p{margin:2px 0;font-size:13.5px;color:var(--muted)}
+.tag.al-dispo{--c:#15803d}.tag.al-partiel{--c:#b45309}.tag.al-complet{--c:#b91c1c}.tag.al-nouveau{--c:#7c3aed;font-weight:700}
+.alnews{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted)}
+.tag.type{--c:#334155;font-weight:700}
+.tag.st-unknown{background:transparent;border:1px dashed var(--muted);color:var(--muted)}
+.tag.mine{--c:var(--accent)}
+
+/* Gestion des lieux */
+.venue.off{opacity:.6}
+.btn.danger{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+form.panel{background:var(--card);border:1px solid var(--accent);border-radius:var(--r);padding:14px;display:grid;gap:10px;margin:10px 0}
+form.panel h3{margin:0;font-size:16px}
+.field{display:grid;gap:4px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.field input,.field select,.field textarea{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:9px 11px;min-width:0;width:100%}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+.formacts{display:flex;gap:8px;justify-content:flex-end}
+.err{color:var(--warn);font-size:13px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));background:var(--ink);color:var(--paper);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;z-index:40;max-width:calc(100% - 32px);text-align:center}
+.venue.sug{border-color:var(--accent);border-style:dashed}
+.sugev{margin:8px 0 0;padding-left:18px;font-size:13.5px;display:grid;gap:3px}
+.sugev .pc{color:var(--muted);font-size:12px}
+.sugev b{font-variant-numeric:tabular-nums}
+.price{font-size:13.5px;margin-top:6px}
+.price b{font-family:var(--display);font-stretch:85%;text-transform:uppercase;font-size:11px;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+.price .pc{color:var(--muted);font-size:12px}
+.legend{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.panel.veille{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:10px 0}.veille h3{margin:0 0 6px}
+.veille details{margin-top:8px}.veille summary{cursor:pointer;font-weight:600}
+.mdsrc{font-size:.9em;line-height:1.45;overflow-wrap:anywhere}.mdsrc h4{margin:14px 0 4px}.mdsrc h4.md3{font-size:.95em}.mdsrc ul{margin:4px 0;padding-left:18px}.mdsrc p{margin:6px 0}.mdsrc code{font-size:.85em;background:var(--paper);padding:0 3px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top" id="top">
+    <div class="brand">
+      <h1>Sorties <span>Paris</span></h1>
+      <div class="sub" id="range">Conférences</div>
+    </div>
+    <div class="search">
+      <label for="q" hidden>Rechercher</label>
+      <input id="q" type="search" placeholder="Intervenant, sujet, lieu…" autocomplete="off">
+    </div>
+  </header>
+
+  <main>
+    <section id="view-agenda">
+      <div class="label">Type de sortie</div>
+      <div class="row" id="types"></div>
+      <div class="label">Thèmes</div>
+      <div class="row" id="themes"></div>
+
+      <div class="cal" aria-label="Agenda">
+        <div class="calhead">
+          <button class="navbtn" id="prev" aria-label="Mois précédent">‹</button>
+          <h2 id="month">Novembre 2026</h2>
+          <button class="navbtn" id="next" aria-label="Mois suivant">›</button>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="quick">
+          <button class="chip" id="q-all" aria-pressed="true">Toutes les dates</button>
+          <button class="chip" id="q-week" aria-pressed="false">Ce week-end</button>
+          <button class="chip" id="q-free" aria-pressed="false">Gratuit</button>
+          <button class="chip" id="q-unk" aria-pressed="false">Places vérifiées seulement</button>
+          <button class="chip" id="q-tiers" aria-pressed="true">Inclure les tiers-lieux</button>
+          <button class="chip" id="q-hours" aria-pressed="true">Mes horaires</button>
+        </div>
+        <div class="legend" id="hoursbox"><label for="hours-from">En semaine, à partir de</label><input id="hours-from" type="time" value="18:30" step="900" style="font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:3px 6px"><span>· le week-end, toute la journée</span></div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="summary"><strong id="count"></strong><button class="reset" id="reset">Réinitialiser</button></div>
+      <div id="out"></div>
+    </section>
+
+    <section id="view-lieux" hidden>
+      <div class="section-title">Lieux</div>
+      <div class="toolbar">
+        <button class="btn primary" id="add-venue">+ Ajouter un lieu</button>
+        <button class="btn" id="add-event">+ Ajouter une conférence</button>
+      </div>
+      <div id="formzone"></div>
+      <div id="veille"></div>
+      <div id="sugs"></div>
+      <div class="list" id="venues"></div>
+    </section>
+
+    <section id="view-alertes" hidden>
+      <div class="section-title">Alertes réservations</div>
+      <p class="legend" id="al-info"></p>
+      <div id="alerts"></div>
+      <form class="panel" id="f-artist">
+        <h3>Suivre un artiste</h3>
+        <label>Nom de l'artiste <input id="fa-name" required placeholder="ex. Charles Pépin"></label>
+        <div class="acts"><button class="btn primary" type="submit">Suivre</button></div>
+      </form>
+    </section>
+    <section id="view-favs" hidden>
+      <div class="section-title">Mes favoris</div>
+      <div id="favs"></div>
+    </section>
+
+    <p class="note" id="note">Places vérifiées <span id="checkdate">le 10 novembre 2026</span> sur les billetteries. Les conférences complètes ont été retirées. « Places dispo » : réservation possible ce jour-là sur la billetterie. « Inscription libre » : gratuit ou sur inscription, sans jauge publiée. « Places non vérifiées » : la billetterie n'affichait pas l'état des places ; elles restent affichées, et « Places vérifiées seulement » permet de les masquer. Revérifiez avant de vous déplacer.</p>
+  </main>
+</div>
+
+<nav class="tabs" role="tablist">
+  <div class="in">
+    <button role="tab" aria-selected="true" data-v="agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Agenda</button>
+    <button role="tab" aria-selected="false" data-v="lieux"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Lieux <span class="badge" id="sugn" hidden></span></span></button>
+    <button role="tab" aria-selected="false" data-v="favs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.4-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.6-9 9-9 9z"/></svg><span>Favoris <span class="badge" id="favn" hidden></span></span></button>
+    <button role="tab" aria-selected="false" data-v="alertes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span>Alertes <span class="badge" id="aln" hidden></span></span></button>
+  </div>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<!-- Alertes réservations : mis à jour chaque jour par la tâche planifiée « Alertes réservations ». -->
+<script id="alerts-data" type="application/json">{"checked": "2026-11-13", "schedule": "", "artists": {"Fabrice Luchini": {"watch": "Bouffes Parisiens, Porte Saint-Martin, Petit Saint-Martin (portestmartin.com), Théâtre de l'Atelier, Fnac Spectacles", "shows": [{"title": "Fabrice Luchini lit Victor Hugo", "venue": "Théâtre de la Porte Saint-Martin", "period": "jusqu'au 2 févr. 2027 · à 19h : 16-17, 23-24 nov., 30 nov.-1er déc., 7, 14-15 déc., 19-20, 26-27 janv., 2 févr.", "price": "19 € à 75,70 €", "status": "nouveau", "note": "Fin de série au 2 févr. 2027, annoncée le 12 nov. et confirmée le 13 nov. par billetterie.portestmartin.fr (du 16 nov. au 2 févr., à 19h). L'état des places par date n'est pas affiché.", "url": "https://www.portestmartin.com/reserver"}, {"title": "L'Art du portrait selon Cioran", "venue": "Théâtre de l'Atelier", "period": "18 et 25 nov., 2 et 9 déc. 2026, 24 et 31 janv., 7 févr. 2027", "price": "24 € à 75,70 €", "status": "partiel", "note": "Le 25 nov. n'était pas réservable sur Fnac Spectacles (pas revérifié le 13 nov.). Le 7 févr. 2027 à 19h figure toujours sur JDS ; pas encore confirmé par la billetterie du théâtre.", "url": "https://www.jds.fr/paris/spectacles/theatre/fabrice-luchini-l-art-du-portrait-selon-cioran-theatre-de-l-atelier-paris-1240405_A"}, {"title": "Quelques informations sur Charles Baudelaire", "venue": "Théâtre de l'Atelier", "period": "lundis 18 et 25 janv., 1er, 8, 15 et 22 févr., 1er mars à 19h ; 15 et 22 mars 2027 à 18h30", "price": "24 € à 75,70 €", "status": "nouveau", "note": "Série apparue sur JDS le 12 nov., toujours listée le 13 nov. avec liens d'achat. Pas encore confirmée sur Fnac Spectacles ni sur le site du théâtre ; état des places non vérifié.", "url": "https://www.jds.fr/artistes/fabrice-luchini-484_N"}, {"title": "Quelques informations sur Charles Baudelaire", "venue": "Théâtre des Bouffes Parisiens", "period": "lundi 5 avril 2027 à 19h", "price": "21 € à 75,70 €", "status": "dispo", "note": "En vente d'après JDS ; annoncé aussi sur portestmartin.com. Aucune autre date aux Bouffes Parisiens trouvée le 13 nov. État des places non vérifié.", "url": "https://www.portestmartin.com/reserver"}, {"title": "Quelques informations sur Charles Baudelaire", "venue": "Théâtre du Petit Saint-Martin", "period": "15 et 29 nov., 3, 10 et 17 déc. 2026", "price": "à partir de 51,50 €", "status": "complet", "note": "Complet au 11 nov. Le 13 nov., Fnac Spectacles n'affiche aucune catégorie réservable pour le 10 déc. (« très forte demande ») ; les autres dates n'ont pas pu être revérifiées.", "url": "https://www.portestmartin.com/reserver"}], "news": [{"date": "2026-11-11", "text": "Début du suivi. Le Petit Saint-Martin est complet ; Victor Hugo a encore des places ; nouvelles dates annoncées sur portestmartin.com."}, {"date": "2026-11-12", "text": "Nouvelles dates : Baudelaire au Théâtre de l'Atelier (9 lundis, 18 janv.-22 mars 2027, d'après JDS), Victor Hugo prolongé au 2 févr. 2027, Cioran le 7 févr. 2027."}]}}}</script>
+<script id="weekly-data" type="application/json">{"checked": "", "schedule": "chaque dimanche vers 7h40", "runs": [], "events": []}</script>
+<script id="sources-md" type="text/markdown">
+# Où trouver les événements de chaque lieu
+
+Ce fichier sert à la veille hebdomadaire de Sorties Paris. Chaque lieu a sa clé (entre accents graves), qu'on utilise dans le champ `v` des événements. Pour une suggestion acceptée, la clé est `s-` suivi de son identifiant.
+
+Mention « (à confirmer) » : la page n'a pas encore été vérifiée. La veille la corrige si elle ne marche pas et met à jour la date de vérification.
+
+## Méthode de la veille
+
+1. Ouvrir la page « Agenda » du lieu. Si elle ne se charge pas, essayer « Aussi ».
+2. En secours, chercher sur le web : `<nom du lieu> agenda <mois> <année>`. Les pages paris.fr/evenements, 75.agendaculturel.fr, unidivers.fr et agenda.parisjetaime.com donnent souvent la date, l'heure et le prix.
+3. Ne garder que ce qui a lieu dans Paris intra-muros. Les conférences doivent rester accessibles, pas trop techniques (modèle : les Lundis Philo de Charles Pépin).
+4. Noter les vrais horaires. Pour un cycle ou une pièce, noter les jours de la semaine et leurs heures (champ `sched`). Pour un marché, un festival ou une expo ouvert tous les jours, mettre `"daily":true`, ou un `sched` avec les horaires. Si les jours ne sont pas connus, ne mettre ni `sched` ni `daily` : l'événement va dans « Dates inconnues » et n'est rattaché à aucune date.
+5. Indiquer l'état des places quand la billetterie l'affiche, et retirer ce qui est complet.
+6. Chaque semaine, revérifier les événements à venir déjà dans l'agenda : places, horaire, prix, annulation. Les corrections vont dans `weekly-data.patch`, sous la clé `"AAAA-MM-JJ|Titre exact"`, par exemple {"st":"ok"}, {"t":"19:00","end":"20:30"}, {"price":"12 €"}, {"st":"complet"} (l'événement disparaît) ou {"cancel":true}. Les clés des événements passés sont supprimées.
+
+## Sources transversales
+
+- Que faire à Paris, week-end : https://www.paris.fr/quefaire/week-end
+- Que faire à Paris, recherche par lieu : https://www.paris.fr/evenements (chercher le nom du lieu)
+- Agenda culturel Paris : https://75.agendaculturel.fr/ (une page par lieu)
+- Paris je t'aime : https://agenda.parisjetaime.com/
+- Unidivers : https://unidivers.fr/ (horaires détaillés)
+
+## MK2 Institut — `mk2odeon` `mk2bib` `mk2bastille` `mk2gambetta` `mk2loire` `mk2nation`
+
+- Agenda : https://www.mk2.com/evenements-en-avant/evenements-mk2-institut
+- Aussi : https://www.mk2.com/evenements/cycles-de-conferences
+- Astuce : la page d'un cycle liste ses séances par salle. La clé du lieu dépend de la salle (Odéon, Bibliothèque, Bastille, Gambetta, Quai de Loire, Nation). Les Lundis Philo sont à l'Odéon.
+
+## Théâtre de la Concorde — `concorde`
+
+- Agenda : https://theatredelaconcorde.paris/programmation/scenes-ouvertes/
+- Billetterie : https://billetterie.theatredelaconcorde.paris/list/events
+- Aussi : l'article paris.fr « la thématique de [mois] au Théâtre de la Concorde » (un par mois), par exemple https://www.paris.fr/evenements/la-confiance-la-thematique-de-novembre-au-theatre-de-la-concorde-126381
+- Astuce : la billetterie et les pages paris.fr de chaque rencontre donnent l'heure exacte.
+
+## Institut du monde arabe — `ima`
+
+- Agenda : https://www.imarabe.org/fr/agenda (à confirmer)
+- Billetterie : https://billetterie.imarabe.org/list/events
+- Astuce : cycle Falsafa (philosophie arabe), Jeudis de l'IMA.
+
+## Académie du Climat — `climat`
+
+- Agenda : https://www.academieduclimat.paris/
+- Aussi : https://www.paris.fr/lieux/academie-du-climat-19860
+
+## Sciences Po — `scpo`
+
+- Agenda : https://www.sciencespo.fr/fr/evenements/ (à confirmer)
+
+## La Bellevilloise — `belle`
+
+- Agenda : https://www.labellevilloise.com/ (à confirmer)
+- Aussi : https://www.paris.fr/evenements (chercher « Bellevilloise »)
+
+## Collège de France — `cdf`
+
+- Agenda : https://www.college-de-france.fr/fr/agenda
+- Aussi : « Les grands rendez-vous de [mois] » sur https://www.college-de-france.fr/fr/actualites
+- Astuce : c'est gratuit et sans inscription, il faut venir 30 minutes avant. Ne garder que les grands événements et colloques grand public, pas les cours spécialisés.
+
+## BnF – Le Collège à la Bibliothèque — `bnf`
+
+- Agenda : https://www.bnf.fr/fr/agenda
+
+## Maison de l'Amérique latine — `mal`
+
+- Agenda : https://www.mal217.org/fr/agenda
+
+## ENS Ulm — `ens`
+
+- Agenda : https://www.ens.psl.eu/agenda
+
+## Gaîté Lyrique — `gaite`
+
+- Agenda : https://www.gaite-lyrique.net/agenda
+
+## IRIS – Pascal Boniface — `iris`
+
+- Agenda : https://www.iris-france.org/evenements/
+
+## Philosophie Magazine — `philomag`
+
+- Agenda : https://www.philomag.com/ (rubrique événements, à confirmer)
+
+## Maison de la Poésie — `poesie`
+
+- Agenda : https://www.maisondelapoesieparis.com/
+
+## Institut d'études avancées — `iea`
+
+- Agenda : https://www.paris-iea.fr/fr/evenements
+
+## Le Grand Continent — `gc`
+
+- Agenda : https://legrandcontinent.eu/fr/evenements/debats
+- Aussi : https://www.billetweb.fr/ (chercher « Grand Continent »)
+
+## Maison Heinrich Heine — `heine`
+
+- Agenda : https://www.maison-heinrich-heine.org/ (à confirmer)
+
+## Maison de la Chimie — `chimie`
+
+- Astuce : la salle accueille des colloques d'autres organisateurs. Chercher « Maison de la Chimie conférence grand public ».
+
+## Péniche Nanna — `nanna`
+
+- Astuce : chercher « Studio Descartes anti-conférence » sur paris.fr.
+
+## Le Consulat Voltaire (tiers-lieu) — `consulat`
+
+- Agenda : https://leconsulat.org/agenda/
+
+## Librairie de Paris — `libparis`
+
+- Agenda : https://www.librairie-de-paris.fr/ (le site bloque parfois la lecture)
+- Aussi : https://www.parislibrairies.fr/agenda.php (filtrer sur Librairie de Paris)
+
+## Presse
+
+### Le Monde — `lemonde` (35 € maximum)
+
+- Agenda : https://ateliers.lemonde.fr/
+- Aussi : chercher « Le Monde Festival » et « soirée Le Monde » avec le mois.
+- Festivals du groupe : le Festival du Monde (septembre), et les festivals de M, le magazine du Monde, sur des sous-domaines dédiés (par exemple https://festival15ansdem.lemonde.fr/, site qui bloque la lecture automatique ; passer par Time Out ou paris.fr). Chercher aussi « festival M le magazine du Monde » et « Le Monde au Grand Rex ».
+
+### Libération — `libe`
+
+- Agenda : https://www.liberation.fr/evenements/ (à confirmer)
+- Aussi : « Université Libé » sur https://www.pantheonsorbonne.fr/
+
+### Courrier international — `courrier`
+
+- Agenda : https://www.courrierinternational.com/ (rubrique événements)
+
+### Le 1 hebdo – Les Lundis du 1 — `le1`
+
+- Agenda : https://le1hebdo.fr/
+
+### Télérama — `telerama`
+
+- Agenda : https://www.telerama.fr/ (rubrique « Télérama Dialogues »)
+
+## Lieux des suggestions acceptées
+
+### Fondation Jean-Jaurès — `s-jaures`
+
+- Agenda : https://www.jean-jaures.org/evenements
+- Astuce : l'heure n'est donnée que sur la page de chaque événement (souvent 18h30–20h30).
+
+### Collège des Bernardins — `s-bernardins`
+
+- Agenda : https://www.collegedesbernardins.fr/agenda
+- Astuce : garder les grandes soirées-débats (souvent 19h30), pas les cours de théologie.
+
+### Mémorial de la Shoah — `s-memorial`
+
+- Agenda : https://www.memorialdelashoah.org/ (« programme » de la période en cours)
+- Aussi : https://www.paris.fr/evenements (chercher « Mémorial de la Shoah »). Les pages paris.fr donnent l'heure et le prix.
+
+### Théâtre de la Porte Saint-Martin — `s-portestmartin`
+
+- Agenda : https://www.portestmartin.com/
+- Billetterie : https://billetterie.portestmartin.fr/
+
+### Le Lucernaire — `s-lucernaire`
+
+- Agenda : https://www.lucernaire.fr/
+- Aussi : https://www.paris.fr/evenements (chercher « Grand entretien Lucernaire »)
+
+### Les Plateaux Sauvages — `s-plateaux`
+
+- Agenda : https://www.lesplateauxsauvages.fr/ (à confirmer)
+
+### Le Carreau du Temple — `s-carreau`
+
+- Agenda : https://www.lecarreaudutemple.eu/
+- Aussi : https://75.agendaculturel.fr/le-carreau-du-temple
+- Astuce : cycle de rencontres de Salomé Saqué.
+
+### La Maison des Canaux — `s-canaux`
+
+- Agenda : https://lamaisondescanaux.fr/ (à confirmer)
+- Aussi : https://www.sortiraparis.com/en/lieux/82888-house-of-canals
+
+## Festivals — type `fest`
+
+Un festival se traite comme un lieu : on ne l'ajoute jamais directement à l'agenda, on le **propose** dans l'onglet Lieux. La veille l'écrit dans `weekly-data.sugs` sous la forme {"id","why","venue":{"name","arr","addr","url","about","kind":"festival"},"events":[…avec "type":"fest"]}. Il n'apparaît dans l'agenda qu'une fois accepté (clé `s-<id>`). On ne repropose pas un festival refusé (rejectedSugs). La même règle vaut pour un nouveau lieu qui n'est pas encore suivi (sans "kind":"festival").
+
+- Agenda culturel, festivals du mois : https://75.agendaculturel.fr/festival/
+- Gaîté Lyrique, festivals : https://www.gaite-lyrique.net/agenda/festival/
+- Ville de Paris, « Les petits bonheurs parisiens de [mois] » : https://www.paris.fr/pages/les-petits-bonheurs-parisiens-de-novembre-25228
+- Sortiraparis, « Que faire en [mois] à Paris » et le guide du week-end
+- Time Out Paris, actualités : https://www.timeout.fr/paris/actualites
+- Astuce : garder les festivals d'idées, de littérature, de cinéma avec débats et de journalisme. Les festivals de musique seule vont dans « Concerts », un type désactivé.
+
+## Quand un lieu est ajouté
+
+Si une nouvelle suggestion est acceptée ou si un lieu est ajouté dans l'appli, lui ajouter ici une section avec sa clé, la page de son agenda et une astuce.
+</script>
+
+<!-- Vos réglages (lieux masqués, lieux et conférences ajoutés). Réécrit par la page quand vous modifiez vos lieux. -->
+<script id="user-data" type="application/json">{"hiddenVenues":[],"customVenues":[],"customEvents":[],"hours":{"on":true,"from":"18:30"},"hiddenEvents":[{"k":"2026-11-12|Paris Photo"},{"k":"2026-10-14|La carte de France de Cassini. Une encyclopédie du territoire"},{"k":"2026-11-12|Marché de Noël de La Défense"},{"k":"2026-09-22|Hassan Hajjaj & Acid Arab : My Rock Stars"},{"k":"2026-09-13|Huit rois (nos présidents)"},{"k":"2026-08-20|L'Art d'avoir toujours raison"}],"acceptedSugs":["bernardins","jaures","memorial","portestmartin","lucernaire","plateaux","carreau","canaux","m15","toutesl","streetpress","ripb"],"rejectedSugs":["comte","citesciences","louvre","forumimages","fmsh","bhvp","uparis","mcjp","citearchi","orsay","shakespeare","bpi","cnam","invalides","petitpalais","museum","chedid","branly","arcueil","iic","cernuschi","cafephilo","tedxmontmartre","mpaa","radiofrance","colline","alliance","cesure","grandecoco","groundcontrol","pointephemere","montenlair","violette","libinstitut","cheries","surfskate","femis","corruption","closeup"],"savedAt":1794488918851,"artists":["Fabrice Luchini"]}</script>
+<script>
+/* Copie intacte du document, prise avant tout rendu : sert à republier la page avec vos réglages. */
+const PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+
+/* la date du jour vient de l'appareil (heure de Paris), à chaque ouverture de la page */
+const TODAY = (()=>{ try{ return new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date()); }catch(_){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); } })();
+
+const TYPES = [
+  {id:"conf", label:"Conférences", on:true},
+  {id:"exc", label:"Événements exceptionnels", on:true},
+  {id:"fest", label:"Festivals", on:true},
+  {id:"expo", label:"Expos", on:true},
+  {id:"concert", label:"Concerts", on:false},
+  {id:"theatre", label:"Théâtre & danse", on:true},
+  {id:"cine", label:"Cinéma", on:false}
+];
+
+const TYPE_TAG = {fest:"Festival", expo:"Expo", concert:"Concert", theatre:"Théâtre / danse", cine:"Cinéma"};
+const THEMES = {
+  philo:{label:"Philo", c:"#7b3fe4"},
+  geo:{label:"Géopolitique", c:"#c2410c"},
+  pol:{label:"Politique & société", c:"#1f4fd1"},
+  eco:{label:"Écologie", c:"#15803d"},
+  litt:{label:"Littérature", c:"#b45309"},
+  econ:{label:"Économie", c:"#0e7490"},
+  hist:{label:"Histoire & arts", c:"#9f1239"},
+  sci:{label:"Sciences", c:"#475569"}
+};
+
+const STATUS = {
+  ok:{label:"Places dispo", cls:"st-ok"},
+  libre:{label:"Inscription libre", cls:"st-libre"},
+  soon:{label:"Résa bientôt ouverte", cls:"st-soon"},
+  unknown:{label:"Places non vérifiées", cls:"st-unknown"}
+};
+
+const BASE_VENUES = {
+  mk2odeon:{name:"MK2 Odéon (côté St-Germain)", arr:"6e", addr:"113 bd Saint-Germain", url:"https://www.mk2.com/evenements", about:"MK2 Institut : les Lundis Philo de Charles Pépin et le cycle cosmos de Christophe Galfard."},
+  mk2bib:{name:"MK2 Bibliothèque", arr:"13e", addr:"128-162 av. de France", url:"https://www.mk2.com/salle/mk2-bibliotheque", about:"Le plus gros pôle MK2 Institut : économie, neurosciences, société."},
+  mk2bastille:{name:"MK2 Bastille (côté Fg St-Antoine)", arr:"11e", addr:"5 rue du Fg Saint-Antoine", url:"https://www.mk2.com/evenements/cycles-de-conferences", about:"Salle MK2 Institut à Bastille."},
+  mk2gambetta:{name:"MK2 Gambetta", arr:"20e", addr:"6 rue Belgrand", url:"https://www.mk2.com/salle/mk2-gambetta", about:"Cycles MK2 Institut (histoire de l'art, alimentation et société)."},
+  mk2loire:{name:"MK2 Quai de Loire", arr:"19e", addr:"7 quai de la Loire", url:"https://www.mk2.com/salle/mk2-quai-seine-quai-loire", about:"Cycles MK2 Institut (justice, féminisme)."},
+  mk2nation:{name:"MK2 Nation", arr:"12e", addr:"133 bd Diderot", url:"https://www.mk2.com/salle/mk2-nation", about:"Conversations et cycles MK2 Institut (journalisme, économie)."},
+  concorde:{name:"Théâtre de la Concorde", arr:"8e", addr:"1 av. Gabriel", url:"https://theatredelaconcorde.paris/programmation/scenes-ouvertes/", about:"Lieu de la Ville de Paris dédié au débat démocratique. Débats souvent gratuits, sur réservation."},
+  ima:{name:"Institut du monde arabe", arr:"5e", addr:"1 rue des Fossés-Saint-Bernard", url:"https://billetterie.imarabe.org/list/events?lang=en", about:"Jeudis de l'IMA, rencontres littéraires et cycle Falsafa sur la philosophie arabe."},
+  climat:{name:"Académie du Climat", arr:"4e", addr:"2 place Baudoyer", url:"https://www.paris.fr/evenements/face-a-l-urgence-climatique-jeunes-et-seniors-se-mobilisent-ensemble-127092", about:"Ancienne mairie du 4e devenue lieu des associations écologistes. Presque tout est gratuit."},
+  scpo:{name:"Sciences Po", arr:"7e", addr:"13 rue de l'Université", url:"https://www.sciencespo.fr/fr/evenements/", about:"Grandes conférences et événements ouverts sur inscription."},
+  belle:{name:"La Bellevilloise", arr:"20e", addr:"19-21 rue Boyer", url:"https://www.paris.fr/evenements/festival-de-la-non-violence-a-la-bellevilloise-127231", about:"Lieu alternatif de Ménilmontant : festivals militants, conférences-débats, salons du livre."},
+  bnf:{name:"BnF François-Mitterrand", arr:"13e", addr:"Quai François-Mauriac, entrée Est", url:"https://www.college-de-france.fr/fr/actualites/le-college-la-bibliotheque-3e-saison", about:"Le Collège à la Bibliothèque : un professeur du Collège de France raconte un grand texte. Gratuit."},
+  cdf:{name:"Collège de France", arr:"5e", addr:"11 place Marcelin-Berthelot", url:"https://www.college-de-france.fr/fr/agenda", about:"Cours et conférences gratuits, sans inscription, dans la limite des places."},
+  mal:{name:"Maison de l'Amérique latine", arr:"7e", addr:"217 bd Saint-Germain", url:"https://www.mal217.org/", about:"Rencontres littéraires et débats sur l'Amérique latine, dans un hôtel particulier avec jardin."},
+  lemonde:{name:"Le Monde", arr:"", addr:"Le Monde Ateliers (auditorium du Monde, 13e, ou salle partenaire)", url:"https://ateliers.lemonde.fr/", about:"Soirées et cours du soir du journal. Filtre : 35 € maximum la place."},
+  libe:{name:"Libération", arr:"5e", addr:"Université Libé, Sorbonne", url:"https://www.pantheonsorbonne.fr/evenements/luniversite-libe-0", about:"Débats de la rédaction avec chercheurs et politiques, gratuits sur inscription."},
+  courrier:{name:"Courrier international", arr:"", addr:"Paris", url:"https://www.courrierinternational.com/", about:"Hebdo de la presse étrangère. Aucune rencontre publique datée pour la période.", watch:true},
+  le1:{name:"Le 1 hebdo – Les Lundis du 1", arr:"1er", addr:"Bourse de Commerce", url:"https://le1hebdo.fr/", about:"Conversation d'une heure animée par Éric Fottorino, un lundi par mois. Pas de date publiée pour la période.", watch:true},
+  telerama:{name:"Télérama", arr:"", addr:"Lieux partenaires", url:"https://www.telerama.fr/", about:"Rencontres « Dialogues » et partenariats de débats (agora 2026-2027). Rien de daté pour la période.", watch:true},
+  gpalais:{name:"Grand Palais", arr:"8e", addr:"Avenue Winston-Churchill", url:"https://www.grandpalais.fr/", about:"Grandes foires et expositions."},
+  defense:{name:"Parvis de La Défense", arr:"La Défense", addr:"Parvis de La Défense (métro 1, RER A)", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", about:"Marché de Noël géant."},
+  tuileries:{name:"Jardin des Tuileries", arr:"1er", addr:"Rue de Rivoli", url:"https://www.sortiraparis.com/en/news/christmas-and-holidays/guides/34166-the-christmas-markets-to-discover-in-paris-and-ile-de-france-in-2026", about:"Marché de Noël et fête foraine d'hiver."},
+  champs:{name:"Avenue des Champs-Élysées", arr:"8e", addr:"Entre la Concorde et l'Étoile", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", about:"Illuminations de Noël et marché."},
+  notredame:{name:"Square René-Viviani", arr:"5e", addr:"Quai de Montebello", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", about:"Marché de Noël face à Notre-Dame."},
+  parisfr:{name:"Que faire à Paris (paris.fr)", arr:"", addr:"", url:"https://www.paris.fr/quefaire/week-end", about:"Idées tirées des sélections de la Ville de Paris : week-ends, théâtre politique."},
+  ldh:{name:"Ligue des droits de l'Homme", arr:"Aubervilliers", addr:"Centre des colloques, Campus Condorcet (métro Front populaire)", url:"https://www.paris.fr/evenements/32e-universite-d-automne-de-la-ldh-sur-le-theme-l-etat-de-droit-contre-l-etat-de-guerre-125778", about:"Université d'automne annuelle : conférences et tables rondes."},
+  orsay40:{name:"Musée d'Orsay", arr:"7e", addr:"Esplanade Valéry-Giscard-d'Estaing", url:"https://www.musee-orsay.fr/fr/programme/agenda", about:"Le musée fête ses 40 ans (ouvert le 9 décembre 1986)."},
+  consulat:{name:"Le Consulat Voltaire", arr:"11e", addr:"14 av. Parmentier", url:"https://leconsulat.org/agenda/", about:"Tiers-lieu culturel : talks, conférences, lectures et concerts.", kind:"tiers"},
+  libparis:{name:"Librairie de Paris", arr:"17e", addr:"7-11 place de Clichy", url:"https://www.librairie-de-paris.fr/", about:"Grande librairie indépendante : rencontres-dédicaces le soir à 19h, entrée libre.", kind:"librairie"},
+  gc:{name:"Le Grand Continent", arr:"", addr:"Paris (lieu donné à l'inscription)", url:"https://legrandcontinent.eu/fr/evenements/debats", about:"Revue de géopolitique européenne : débats d'une heure en soirée."},
+  heine:{name:"Maison Heinrich Heine", arr:"14e", addr:"Cité U, 27C bd Jourdan", url:"https://www.paris.fr/evenements/defense-europeenne-securite-et-relations-transatlantiques-124736", about:"Maison franco-allemande de la Cité universitaire. Cycle « Vers un nouvel ordre mondial ? »."},
+  chimie:{name:"Maison de la Chimie", arr:"7e", addr:"28 rue Saint-Dominique", url:"https://lamaisondessagesses.com/colloque-la-philosophie-comme-art-de-vivre/", about:"Centre de congrès qui accueille de grands colloques grand public."},
+  nanna:{name:"Péniche Nanna", arr:"5e", addr:"Port de Montebello", url:"https://www.paris.fr/evenements/l-anti-conference-philo-art-par-studio-descartes-126936", about:"Péniche face à Notre-Dame : anti-conférences de philo de Studio Descartes."},
+  iris:{name:"IRIS – Pascal Boniface", arr:"11e", addr:"2 bis rue Mercœur", url:"https://www.iris-france.org/evenements/", about:"Conférences-débats de géopolitique. Aucune date publiée pour la période.", watch:true},
+  gaite:{name:"Gaîté Lyrique", arr:"3e", addr:"3 bis rue Papin", url:"https://www.gaite-lyrique.net/agenda", about:"Débats, Nuit des controverses, festival Effractions. Rien de daté pour la période.", watch:true},
+  ens:{name:"ENS Ulm", arr:"5e", addr:"45 rue d'Ulm", url:"https://www.ens.psl.eu/agenda", about:"Nuit de l'ENS, Semaine du cerveau (mars), conférences grand public.", watch:true},
+  philomag:{name:"Philosophie Magazine", arr:"", addr:"Événements annoncés dans le magazine", url:"https://www.philomag.com/", about:"Soirées et rencontres ponctuelles.", watch:true},
+  poesie:{name:"Maison de la Poésie", arr:"3e", addr:"157 rue Saint-Martin", url:"https://www.maisondelapoesieparis.com/", about:"Rencontres avec écrivains presque tous les soirs.", watch:true},
+  iea:{name:"Institut d'études avancées", arr:"4e", addr:"17 quai d'Anjou", url:"https://www.paris-iea.fr/fr/evenements", about:"Hôtel de Lauzun : cycles gratuits sur inscription.", watch:true}
+};
+
+const MK2 = "19 € · -26 ans 9 €";
+const BASE_EVENTS = [
+  {d:"2026-11-12", t:"19:00", end:"20:30", title:"Nous Présidentes – émission en public", who:"Giulia Foïs et son invitée", v:"mk2bib", th:["pol"], price:"Payant", st:"unknown", url:"https://www.mk2.com/evenement/nous-presidentes-le-cycle-de-conferences-de-giulia-fois-mk2-institut", desc:"Interview-spectacle : l'invitée se fait candidate à la présidentielle le temps d'une soirée."},
+  {d:"2026-11-14", t:"09:00", end:"18:30", title:"La philosophie comme art de vivre", who:"Colloque présenté par Frédéric Lenoir", v:"chimie", th:["philo"], price:"Payant", st:"libre", url:"https://lamaisondessagesses.com/colloque-la-philosophie-comme-art-de-vivre/", desc:"Une journée de philosophie pratique, organisée par La Maison des Sagesses. Billetterie ouverte, jauge non publiée."},
+  {d:"2026-11-14", t:"17:00", end:"19:00", title:"L'anti-conférence philo : l'art", who:"Studio Descartes, avec le philosophe Charles Bobant", v:"nanna", th:["philo","hist"], price:"Sur réservation", st:"libre", url:"https://www.paris.fr/evenements/l-anti-conference-philo-art-par-studio-descartes-126936", desc:"Un buzzer permet au public d'interrompre pour demander une explication. Réservation sur nanna-paris.fr."},
+  {d:"2026-11-14", dEnd:"2026-12-19", t:"", sched:{6:["14:30","16:00"]}, title:"L'Agora stoïcienne", who:"Guillaume Beauquesne", v:"concorde", th:["philo"], free:true, st:"libre", url:"https://www.paris.fr/evenements/agora-stoicienne-104325", desc:"Cycle de rencontres d'environ 2 h pour appliquer le stoïcisme aux questions d'aujourd'hui, jusqu'au 19 décembre. Réservation obligatoire."},
+  {d:"2026-11-15", t:"", title:"Dernières nouvelles du cosmos", who:"Christophe Galfard, physicien", v:"mk2odeon", th:["sci"], price:MK2, st:"unknown", url:"https://www.mk2.com/evenement/dernieres-nouvelles-du-cosmos-le-cycle-de-conferences-de-christophe-galfard-mk2-institut", desc:"Des atomes aux trous noirs, avec les dernières découvertes et les questions du public."},
+  {d:"2026-11-16", t:"19:00", title:"Peut-on rêver d'équité au travail ?", who:"Céline Marty – Travailler moins pour vivre mieux ?", v:"mk2bastille", th:["philo","pol"], price:"Carte 5 : 14,90 €/place", st:"ok", url:"https://www.mk2.com/evenement/travailler-moins-pour-vivre-mieux-le-cycle-de-conferences-de-celine-marty-mk2-institut", desc:"Hiérarchie, autorité, contrôle : peut-on démocratiser le travail et inventer d'autres organisations ?"},
+  {d:"2026-11-16", t:"09:00", end:"20:00", title:"Climat : jeunes et seniors se mobilisent ensemble", who:"Alliance des Générations pour le Climat, avec Corinne Lepage", v:"climat", th:["eco"], free:true, st:"libre", url:"https://www.paris.fr/evenements/face-a-l-urgence-climatique-jeunes-et-seniors-se-mobilisent-ensemble-127092", desc:"Tables rondes sur l'équité entre générations, duplex avec la COP31 à partir de 14 h, concert en fin de journée. Inscription conseillée."},
+  {d:"2026-11-17", t:"19:00", title:"Ni muses ni soumises", who:"Anne Bourrassé – Une autre histoire de l'art", v:"mk2gambetta", th:["hist"], price:"Carte 5 : 14,90 €/place", st:"ok", url:"https://www.mk2.com/evenement/une-autre-histoire-de-lart-le-cycle-de-conferences-anne-bourrasse-mk2-institut", desc:"Pourquoi dit-on « modèles » pour les hommes et « muses » pour les femmes ? Les artistes femmes qui ont revendiqué leur pouvoir de création."},
+  {d:"2026-11-17", t:"", title:"Quand les scénaristes de fiction écrivent la politique", who:"Rencontre", v:"concorde", th:["pol"], price:"Sur réservation", st:"libre", url:"https://www.paris.fr/evenements/la-confiance-la-thematique-de-novembre-au-theatre-de-la-concorde-126381", desc:"Comment séries et films racontent le pouvoir. Mois de la confiance à la Concorde."},
+  {d:"2026-11-17", t:"19:00", title:"Rencontre croisée d'écrivains", who:"Taleb Alrefai, Inam Bioud, Jadd Hilal, Xavier Le Clerc", v:"ima", th:["litt"], price:"Billetterie IMA", st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"Quatre auteurs de littérature arabe et francophone en dialogue."},
+  {d:"2026-11-18", t:"18:00", end:"21:30", title:"Les nouvelles pratiques du journalisme (#NPDJ)", who:"École de journalisme de Sciences Po", v:"scpo", th:["pol"], free:true, st:"soon", url:"https://www.sciencespo.fr/fr/evenements/npdj-les-nouvelles-pratiques-du-journalisme-2026/", desc:"Conférence annuelle, amphi Jean Moulin. Gratuit, inscription préalable (lien annoncé « à venir » sur la page)."},
+  {d:"2026-11-18", t:"19:00", end:"21:30", title:"Voyage en 2030 Glorieuses", who:"Ça Commence Par Moi", v:"climat", th:["eco"], free:true, st:"ok", url:"https://www.helloasso.com/associations/ca-commence-par-moi/evenements/voyage-en-2030-glorieuses-a-l-academie-du-climat-18-novembre-a-19h", desc:"Atelier participatif pour imaginer un futur désirable. Il restait 30 places au 10 novembre."},
+  {d:"2026-11-19", t:"19:00", end:"20:30", title:"La démocratie pour tous : peut-on encore faire confiance ?", who:"Alexis Spire et Loïc Blondiaux", v:"concorde", th:["pol"], price:"Gratuit, sur réservation", free:true, st:"libre", url:"https://www.paris.fr/evenements/la-confiance-la-thematique-de-novembre-au-theatre-de-la-concorde-126381", desc:"Un sociologue et un politiste sur la défiance et la participation citoyenne."},
+  {d:"2026-11-19", t:"18:30", end:"20:00", title:"Le Collège à la Bibliothèque", who:"Un professeur du Collège de France", v:"bnf", th:["hist","sci"], free:true, st:"libre", url:"https://www.college-de-france.fr/fr/actualites/le-college-la-bibliotheque-3e-saison", desc:"Un grand texte de l'histoire des sciences raconté par un chercheur. Réservation conseillée sur le site de la BnF."},
+  {d:"2026-11-19", t:"19:30", end:"21:00", title:"Le Sud global, un acteur géopolitique ?", who:"Florian Louis – Cycle « Introduction à la géopolitique »", v:"gc", th:["geo"], price:"30 €", st:"unknown", url:"https://www.billetweb.fr/cycle-introduction-a-la-geopolitique", desc:"Inde, Brésil, Afrique du Sud… existe-t-il un bloc commun face à l'Occident ? Leçon d'une heure puis questions, amphi Jean-Jaurès, ENS (29 rue d'Ulm, 5e). Arriver entre 19h et 19h25 ; replay envoyé le lendemain."},
+  {type:"fest", d:"2026-11-21", t:"13:00", end:"23:00", title:"Festival de la non-violence", who:"Avec Lumir Lapray et Gabriel Mazzolini (Amis de la Terre)", v:"belle", th:["pol","eco"], price:"Prix libre", st:"libre", url:"https://www.paris.fr/evenements/festival-de-la-non-violence-a-la-bellevilloise-127231", desc:"Conférences, ateliers et village associatif sur la désobéissance non violente. Inscription sur HelloAsso."},
+  {d:"2026-11-21", t:"16:30", title:"Un Libanais à Paris", who:"Alexandre Najjar", v:"ima", th:["litt"], price:"Billetterie IMA", st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"Présentation de livre."},
+  {d:"2026-11-22", t:"11:00", title:"Les animaux ont-ils une psychologie ?", who:"Albert Moukheiber – Votre cerveau vous joue des tours", v:"mk2bib", th:["sci","philo"], price:"Carte 5 : 14,90 €/place", st:"ok", url:"https://www.mk2.com/evenement/votre-cerveau-vous-joue-des-tours-le-cycle-de-conferences-d-albert-moukheiber-mk2-institut", desc:"Affects, décisions, éthique : ce que vivent les autres espèces. En salle immersive Paradiso."},
+  {d:"2026-11-24", t:"17:30", end:"19:00", title:"Michel Foucault au Collège de France", who:"Cycle autour de l'exposition Foucault", v:"cdf", th:["philo","hist"], free:true, st:"libre", url:"https://www.college-de-france.fr/fr/actualites/les-grands-rendez-vous-octobre-2026", desc:"Entrée libre sans inscription, dans la limite des places. Arrivez en avance."},
+  {d:"2026-11-24", t:"19:00", title:"Debout dans tes rêves", who:"Abdellah Taïa", v:"ima", th:["litt"], price:"Billetterie IMA", st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"L'écrivain marocain présente son nouveau livre."},
+  {d:"2026-11-26", t:"19:00", title:"Rester célibataire", who:"Nesrine Slaoui – Arrogante, leçon 3", v:"mk2loire", th:["pol"], price:"Carte 5 : 14,90 €/place", st:"unknown", url:"https://www.mk2.com/evenement/arrogante-trois-lecons-pour-occuper-lespace-le-cycle-de-conferences-de-nesrine-slaoui-mk2-institut", desc:"Misogynie ordinaire, réputations et injonctions, de l'Antiquité à la pop culture. Se suit seule."},
+  {d:"2026-11-26", t:"", title:"Au cœur de l'enquête", who:"Clémentine Goldszal", v:"mk2nation", th:["pol"], price:"Carte 5 : 14,90 €/place", st:"unknown", url:"https://www.mk2.com/evenement/au-coeur-de-lenquete-le-cycle-de-conferences-de-clementine-goldszal-mk2-institut", desc:"Des reporters d'investigation racontent les coulisses de leurs enquêtes."},
+  {d:"2026-11-26", t:"19:00", title:"L'Alhambra, laboratoire d'idées", who:"Jeudis de l'IMA", v:"ima", th:["hist","philo"], price:"Billetterie IMA", st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"L'Andalousie médiévale comme lieu d'échanges intellectuels."},
+  {d:"2026-11-26", t:"19:30", end:"21:00", title:"Où va la guerre d'Iran ?", who:"Florian Louis – Cycle « Introduction à la géopolitique »", v:"gc", th:["geo"], price:"30 €", st:"unknown", url:"https://www.billetweb.fr/cycle-introduction-a-la-geopolitique", desc:"Décryptage du conflit et de ses suites régionales. Leçon d'une heure puis questions, amphi Jean-Jaurès, ENS (29 rue d'Ulm, 5e). Arriver entre 19h et 19h25 ; replay envoyé le lendemain."},
+  {d:"2026-11-25", t:"14:00", end:"19:00", title:"Paris Anti-Mascu : un combat, des solutions", who:"Tables rondes avec Laure Salmona, Sophia Ayada, Évelyne Corbière… puis stand-up de Christine Berrou", v:"concorde", th:["pol"], price:"Gratuit, sur réservation", free:true, st:"libre", url:"https://www.paris.fr/evenements/paris-anti-mascu-un-combat-des-solutions-126609", desc:"La montée du masculinisme sur les réseaux et les moyens d'y répondre : témoignages à 14h30, solutions à 16h, spectacle à 18h."},
+  {d:"2026-11-11", t:"19:00", title:"Kometa fête ses 3 ans", who:"Conférence, puis concert et club", v:"consulat", th:["litt","geo"], price:"Voir le site", st:"unknown", url:"https://leconsulat.org/kometa-fete-ses-3-ans/", desc:"La revue de reportages Kometa fête son anniversaire."},
+  {type:"fest", d:"2026-11-12", t:"16:30", title:"Festival de la Cimade : Décaler le regard", who:"Talk, puis concert et DJ set", v:"consulat", th:["pol","geo"], price:"Voir le site", st:"unknown", url:"https://leconsulat.org/festival-cimade-decaler-le-regard/", desc:"Le festival de l'association d'aide aux personnes migrantes."},
+  {d:"2026-11-28", t:"20:00", title:"« Ne dites pas Macbeth » : lecture théâtralisée", who:"Avec Denis Lavant", v:"consulat", th:["litt"], price:"Voir le site", st:"unknown", url:"https://leconsulat.org/lecture-theatralisee-de-la-piece-ne-dites-pas-macbeth-avec-denis-lavant/", desc:"Un samedi soir de lecture avec le comédien."},
+  {d:"2026-11-11", t:"19:00", title:"Hugo Clément : rencontre-dédicace BD", who:"Hugo Clément", v:"libparis", th:["eco"], price:"Entrée libre", free:true, st:"libre", url:"https://www.librairie-de-paris.fr/agenda-206545/bande-dessinee-hugo-clement/", desc:"Le journaliste présente son dernier album : discussion et signature."},
+  {type:"fest", d:"2026-11-27", dEnd:"2026-11-28", t:"", title:"Festival Le Fun !", who:"Imaginé par Usbek & Rica", v:"concorde", th:["pol","sci"], price:"Sur réservation", st:"libre", url:"https://www.paris.fr/evenements/la-confiance-la-thematique-de-novembre-au-theatre-de-la-concorde-126381", desc:"Deux jours de conférences avec chercheurs, artistes et journalistes sur les défis du futur."},
+  {d:"2026-11-28", t:"15:00", end:"16:00", title:"Averroès : 900 ans de pensée vivante et universelle", who:"Table ronde – Falsafa", v:"ima", th:["philo"], price:"Gratuit, réservation conseillée", free:true, st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"Pour les 900 ans du philosophe de Cordoue."},
+  {d:"2026-12-01", t:"18:30", end:"20:00", title:"Savants et charlatans : le cas Mesmer", who:"Antoine Lilti, Collège de France", v:"bnf", th:["hist","sci"], free:true, st:"libre", url:"https://www.college-de-france.fr/fr/actualites/savants-et-charlatans-le-cas-mesmer", desc:"Le magnétisme animal et les controverses médicales au siècle des Lumières. Réservation conseillée sur le site de la BnF."},
+  {d:"2026-12-03", t:"19:30", end:"21:00", title:"Qu'est-ce qu'une frontière ?", who:"Florian Louis – Cycle « Introduction à la géopolitique »", v:"gc", th:["geo"], price:"30 €", st:"unknown", url:"https://www.billetweb.fr/cycle-introduction-a-la-geopolitique", desc:"Murs, migrations, souveraineté : ce que trace une frontière aujourd'hui. Leçon d'une heure puis questions, amphi Jean-Jaurès, ENS (29 rue d'Ulm, 5e). Arriver entre 19h et 19h25 ; replay envoyé le lendemain."},
+  {type:"fest", d:"2026-12-05", dEnd:"2026-12-06", t:"", title:"Mi Livre Mi Raisin", who:"Salon d'auteurs et de vins naturels", v:"belle", th:["litt"], price:"Voir le site", st:"libre", url:"https://parisjetaime.com/eng/event/fair-mi-livre-mi-raisin-paris-e1939", desc:"Rencontres avec des auteurs, culture et agriculture. Un salon plutôt qu'une conférence."},
+  {d:"2026-12-07", t:"20:00", title:"Qu'est-ce que l'état du monde fait à l'économie ?", who:"Jean Tirole, prix Nobel d'économie", v:"mk2nation", th:["econ","geo"], price:"Livre + conf. 31,80 €", st:"ok", url:"https://www.mk2.com/evenement/qu-est-ce-que-l-etat-du-monde-fait-a-l-economie-mk2-institut", desc:"Rivalités de puissances, guerre des technologies, tensions commerciales : qui gagne, qui perd, qui décide ? Autour d'Économie du désordre mondial."},
+  {d:"2026-12-08", t:"", title:"Croire en la justice", who:"Seydi Ba, avocat", v:"mk2loire", th:["pol"], price:"Carte 5 : 14,90 €/place", st:"unknown", url:"https://www.mk2.com/evenement/croire-en-la-justice-cycle-conferences-seydi-ba-mk2-institut", desc:"Comment le droit se fabrique et qui le contrôle, du Conseil constitutionnel à la CEDH."},
+  {d:"2026-12-08", t:"19:00", title:"Rencontre croisée d'autrices", who:"Iman Ahmed, Soundouss Chraïbi, Sarah Tadlaoui", v:"ima", th:["litt"], price:"Billetterie IMA", st:"ok", url:"https://billetterie.imarabe.org/list/events?lang=en", desc:"Trois voix de la littérature contemporaine."},
+  {d:"2026-12-08", t:"19:30", title:"La fin de la domination occidentale ?", who:"Table ronde avec Daniel Marwecki, animée par Matthias Krupa", v:"heine", th:["geo"], price:"Voir le site", st:"libre", url:"https://www.paris.fr/evenements/defense-europeenne-securite-et-relations-transatlantiques-124736", desc:"Recomposition des équilibres mondiaux, cycle « Vers un nouvel ordre mondial ? »."},
+  {d:"2026-12-09", t:"19:00", end:"20:30", title:"Amazonie : du mythe de la forêt vierge aux enjeux de notre avenir", who:"La Maison de l'Amazonie", v:"mal", th:["eco","hist"], price:"Billetterie HelloAsso", st:"libre", url:"https://www.helloasso.com/associations/la-maison-de-l-amazonie/evenements/amazonie-du-mythe-de-la-foret-vierge-aux-enjeux-de-notre-avenir", desc:"Dix mille ans d'histoire humaine en Amazonie, et pourquoi son avenir nous concerne."},
+  {d:"2026-12-10", t:"", title:"Cinquante nuances de postcapitalisme", who:"Timothée Parrique – L'économie contre-attaque", v:"mk2bib", th:["econ","eco"], price:"Carte 5 : 14,90 €/place", st:"unknown", url:"https://www.mk2.com/evenement/timothee-parrique-l-economie-contre-attaque-mk2-institut", desc:"Participalisme, convivialisme, écosocialisme : une cartographie des alternatives au capitalisme."},
+  {d:"2026-12-13", t:"11:00", title:"La technologie pense-t-elle à notre place ?", who:"Albert Moukheiber – Votre cerveau vous joue des tours", v:"mk2bib", th:["sci","philo"], price:"Carte 5 : 14,90 €/place", st:"unknown", url:"https://www.mk2.com/evenement/votre-cerveau-vous-joue-des-tours-le-cycle-de-conferences-d-albert-moukheiber-mk2-institut", desc:"L'esprit étendu : nos outils font-ils partie de notre pensée ?"},
+  {d:"2026-12-14", t:"18:30", title:"La foi peut-elle être un choix ?", who:"Charles Pépin – Lundis Philo", v:"mk2odeon", th:["philo"], price:MK2, st:"ok", url:"https://www.mk2.com/evenement/charles-pepin-lundis-philo-mk2-institut", desc:"Croire, douter, décider. Durée 1 h 15. Seule séance des Lundis Philo encore réservable : les autres affichent complet."},
+  {d:"2026-12-15", t:"18:30", end:"20:00", title:"De la philosophie aux mathématiques : l'intelligence pas si artificielle", who:"Stéphane Mallat, Collège de France", v:"bnf", th:["philo","sci"], free:true, st:"soon", url:"https://www.college-de-france.fr/fr/actualites/de-la-philosophie-aux-mathematiques", desc:"Rationalistes contre empiristes, une vieille querelle au cœur de l'IA. Réservations ouvertes un mois avant, soit vers le 15 novembre."},
+  {d:"2026-12-15", t:"17:30", end:"19:00", title:"Michel Foucault au Collège de France", who:"Dernière séance du cycle", v:"cdf", th:["philo","hist"], free:true, st:"libre", url:"https://www.college-de-france.fr/fr/actualites/les-grands-rendez-vous-octobre-2026", desc:"Entrée libre sans inscription, dans la limite des places."},
+  {d:"2026-12-15", t:"19:00", title:"La lutte des classes passe-t-elle par l'assiette ?", who:"Aïtor Alfonso – Voyage au ventre du monde", v:"mk2gambetta", th:["pol","hist"], price:"19,90 € · -26 ans 9,90 €", st:"unknown", url:"https://www.mk2.com/evenement/voyage-au-ventre-du-monde-le-cycle-de-conferences-de-aitor-alfonso-mk2-institut", desc:"Du banquet antique au repas de famille : qui sert, qui distribue, qui a le droit de s'asseoir à table ?"},
+  {d:"2026-11-12", t:"19:30", end:"21:00", title:"L'Europe, une grande puissance ?", who:"Florian Louis – Cycle « Introduction à la géopolitique »", v:"gc", th:["geo"], price:"30 €", st:"unknown", url:"https://www.billetweb.fr/cycle-introduction-a-la-geopolitique", desc:"L'Union peut-elle peser face aux États-Unis et à la Chine ? Leçon d'une heure puis questions, amphi Jean-Jaurès, ENS (29 rue d'Ulm, 5e). Arriver entre 19h et 19h25 ; replay envoyé le lendemain."},
+  {d:"2026-11-16", t:"19:30", end:"21:00", title:"Marine Le Pen peut-elle encore perdre ?", who:"Débat du Grand Continent", v:"gc", th:["pol"], price:"Sur inscription", st:"libre", url:"https://legrandcontinent.eu/fr/evenements/debats", desc:"Les rapports de force à quelques mois de la présidentielle 2027."},
+  {d:"2026-12-14", t:"19:30", end:"21:00", title:"Le centre peut-il survivre à Macron ?", who:"Débat du Grand Continent", v:"gc", th:["pol"], price:"Sur inscription", st:"libre", url:"https://legrandcontinent.eu/fr/evenements/debats", desc:"Que devient le bloc central après deux quinquennats ?"},
+  {d:"2026-11-30", t:"", title:"Le Monde sur scène – deuxième séance", who:"Journalistes de la rédaction du Monde", v:"lemonde", th:["pol","geo"], price:"Prix à vérifier (35 € max)", st:"unknown", url:"https://ateliers.lemonde.fr/", desc:"Suite de l'édition spéciale jouée sur scène, après « Quel monde après Trump ? » au Grand Rex le 10 novembre. Sujet et lieu à confirmer."},
+  {d:"2026-11-18", t:"18:00", end:"19:15", title:"Vote à l'extrême droite : une fatalité ?", who:"Université Libé – Soirée politique", v:"libe", th:["pol"], price:"Gratuit, sur inscription", free:true, st:"libre", url:"https://www.pantheonsorbonne.fr/evenements/luniversite-libe-0", desc:"Amphithéâtre Richelieu, entrée 17 rue de la Sorbonne."},
+  {d:"2026-11-18", t:"", title:"Nos politiques sont-ils à la hauteur des enjeux ?", who:"Université Libé – Soirée politique", v:"libe", th:["pol"], price:"Gratuit, sur inscription", free:true, st:"libre", url:"https://www.pantheonsorbonne.fr/evenements/luniversite-libe-0", desc:"Suite de la soirée politique. Programme à venir."},
+  {d:"2026-11-19", t:"15:00", end:"16:15", title:"Le numérique à l'assaut de nos démocraties", who:"Avec Claire Hédon, Claire Thoury, Bastien François", v:"libe", th:["pol","sci"], price:"Gratuit, sur inscription", free:true, st:"libre", url:"https://www.pantheonsorbonne.fr/evenements/luniversite-libe-0", desc:"Amphithéâtre Oury, entrée 14 rue Cujas."},
+  {d:"2026-11-19", t:"19:45", end:"21:00", title:"Urgence climatique, adaptation démocratique ?", who:"Université Libé", v:"libe", th:["eco","pol"], price:"Gratuit, sur inscription", free:true, st:"libre", url:"https://www.pantheonsorbonne.fr/evenements/luniversite-libe-0", desc:"Comment la démocratie peut-elle répondre au climat ? Amphithéâtre Oury."}
+].map((e,i)=>({...e,id:"e"+i,type:e.type||"conf"}));
+
+
+/* Événements exceptionnels : festivals, sommets, anniversaires, éditions spéciales. */
+const EXC_EVENTS = [
+  {d:"2026-11-12", dEnd:"2026-11-15", t:"13:00", end:"20:00", title:"Paris Photo", who:"29e édition, plus de 230 exposants de 30 pays", v:"gpalais", cat:"Foire d'art", th:[], price:"36 € en semaine · 41 € le week-end · réduit 15 €", st:"unknown", url:"https://www.visitparisregion.com/fr/paris-photo", desc:"La grande foire mondiale de la photographie sous la verrière du Grand Palais, l'année du bicentenaire de la photo. Dimanche jusqu'à 19h."},
+  {d:"2026-11-12", dEnd:"2026-12-31", t:"", sched:{0:["10:00","21:30"],1:["11:00","21:00"],2:["11:00","21:00"],3:["11:00","21:00"],4:["11:00","21:00"],5:["11:00","23:00"],6:["10:00","23:00"]}, title:"Marché de Noël de La Défense", who:"Le plus grand marché de Noël d'Île-de-France", v:"defense", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets sur le parvis et patinoire (jusqu'au 3 janvier)."},
+  {d:"2026-11-14", dEnd:"2027-01-03", t:"", sched:{0:["11:00","23:30"],1:["11:00","23:30"],2:["11:00","23:30"],3:["11:00","23:30"],4:["11:00","23:30"],5:["11:00","23:30"],6:["11:00","23:30"]}, title:"Marché de Noël des Tuileries", who:"La Magie de Noël", v:"tuileries", cat:"Noël", th:[], price:"Entrée libre (manèges payants)", free:true, st:"libre", url:"https://www.sortiraparis.com/en/news/christmas-and-holidays/guides/34166-the-christmas-markets-to-discover-in-paris-and-ile-de-france-in-2026", desc:"Chalets, manèges et gourmandises dans le jardin des Tuileries."},
+  {d:"2026-11-22", dEnd:"2027-01-04", t:"", daily:true, title:"Retour du marché de Noël des Champs-Élysées et illuminations", who:"Après près de dix ans d'absence", v:"champs", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Chalets en bas de l'avenue, côté Concorde ; ouverture le jour du lancement des illuminations (17h-minuit, 1h le week-end)."},
+  {d:"2026-11-26", dEnd:"2026-12-27", t:"10:00", end:"20:00", daily:true, title:"Marché de Noël de Notre-Dame", who:"Square René-Viviani", v:"notredame", cat:"Noël", th:[], price:"Gratuit", free:true, st:"libre", url:"https://www.jds.fr/paris/manifestations-et-animations/noel/marche-de-noel-paris-259874_A", desc:"Artisans et spécialités régionales face à la cathédrale, au bord de la Seine."},
+  {d:"2026-11-21", t:"11:30", end:"18:30", title:"Paris contre l'oligarchie internationale", who:"Sommet avec l'Observatoire international de la fiscalité, l'ICRICT et le PSE Stone Center", v:"concorde", cat:"Sommet", th:[], price:"Gratuit, sur réservation", free:true, st:"unknown", url:"https://www.paris.fr/evenements/paris-contre-l-oligarchie-internationale-126136", desc:"Richesses extrêmes, concentration du pouvoir économique, médiatique et technologique : comment y répondre ?"},
+  {d:"2026-11-21", dEnd:"2026-11-22", t:"09:30", title:"L'État de droit contre l'état de guerre", who:"32e université d'automne de la LDH", v:"ldh", cat:"Rencontres", th:[], price:"Voir le site", st:"unknown", url:"https://www.paris.fr/evenements/32e-universite-d-automne-de-la-ldh-sur-le-theme-l-etat-de-droit-contre-l-etat-de-guerre-125778", desc:"Un week-end de conférences et de tables rondes sur les libertés face à la guerre et à la loi du plus fort."},
+  {d:"2026-12-05", dEnd:"2026-12-06", t:"", title:"Orsay a 40 ans : le week-end anniversaire", who:"Musée d'Orsay", v:"orsay40", cat:"Anniversaire", th:[], price:"Gratuit", free:true, st:"soon", url:"https://www.musee-orsay.fr/fr/programme/agenda", desc:"Un week-end festif et gratuit pour les 40 ans du musée. Programme et réservations bientôt en ligne."}
+].map((e,i)=>({...e,id:"x"+i,type:e.type||"exc"}));
+
+
+/* Idées relevées dans les sélections de la Ville de Paris (Que faire à Paris ce week-end ; Ces pièces de théâtre qui parlent intelligemment de politique), 11 novembre 2026. */
+const PF = "https://www.paris.fr/evenements/";
+const PF_EVENTS = [
+  /* Théâtre politique */
+  {type:"theatre", d:"2026-08-20", dEnd:"2026-12-19", t:"", sched:{4:["21:00",""],5:["21:00",""],6:["18:30",""]}, title:"L'Art d'avoir toujours raison", who:"Fausse conférence sur l'art de gagner une élection", place:"Théâtre Tristan-Bernard", arr:"8e", addr:"64 rue du Rocher", th:[], price:"11 à 38 €", st:"unknown", url:PF+"l-art-d-avoir-toujours-raison-au-theatre-tristan-bernard-116953", desc:"Les techniques de persuasion des discours politiques, démontées sur scène. Dernières dates jusqu'au 14 novembre."},
+  {type:"theatre", d:"2026-09-10", dEnd:"2027-01-03", t:"", sched:{4:["21:00","22:20"],5:["19:00","20:20"],6:["21:00","22:20"],0:["15:00","16:20"]}, title:"Napo", who:"Comédie", place:"Théâtre Comédie Bastille", arr:"11e", addr:"5 rue Nicolas-Appert", th:[], price:"12,50 à 40 €", st:"unknown", url:PF+"napo-118081", desc:"Napoléon débarque en 2026, persuadé d'être l'homme providentiel : une comédie qui joue avec la politique d'aujourd'hui."},
+  {type:"theatre", d:"2026-09-13", dEnd:"2027-04-11", t:"", sched:{0:["17:30",""]}, title:"Huit rois (nos présidents)", who:"Mise en scène Léo Cohen-Paperman", place:"Théâtre de la Pépinière", arr:"2e", addr:"7 rue Louis-le-Grand", th:[], price:"À partir de 12 €", st:"unknown", url:PF+"huit-rois-nos-presidents-126835", desc:"Le dimanche, à 17h30, 19h30 ou 20h selon l'épisode. La Ve République racontée par ses présidents, et les espoirs et déceptions des Français à chaque époque."},
+  {type:"theatre", d:"2026-11-25", dEnd:"2026-12-11", t:"", sched:{1:["20:00","22:30"],2:["20:00","22:30"],3:["20:00","22:30"],4:["20:00","22:30"],5:["20:00","22:30"],6:["18:00","20:30"]}, title:"J'attends peu, j'aspire à beaucoup", who:"Hugues Duchêne", place:"Théâtre 13 – Bibliothèque", arr:"13e", addr:"30 rue du Chevaleret", th:[], price:"Voir le site", st:"unknown", url:PF+"j-attends-peu-j-aspire-a-beaucoup-hugues-duchene-126102", desc:"Les cinquante prochaines années de la politique française, à travers un personnage suivi de 10 à 60 ans : agriculture, égalité, climat."},
+  /* Expos repérées dans Que faire à Paris ce week-end */
+  {type:"expo", d:"2026-10-14", dEnd:"2027-02-01", t:"", title:"La carte de France de Cassini. Une encyclopédie du territoire", who:"Archives nationales et IGN", place:"Archives nationales – Hôtel de Soubise", arr:"3e", addr:"60 rue des Francs-Bourgeois", th:[], price:"Gratuit", free:true, st:"libre", url:PF+"la-carte-de-france-de-cassini-une-encyclopedie-du-territoire-118002", desc:"La première carte complète du royaume, au XVIIIe siècle : se perdre dans la France d'avant la Révolution."},
+  {type:"expo", d:"2026-09-22", dEnd:"2027-04-25", t:"", sched:{2:["12:00","18:00"],3:["12:00","18:00"],4:["12:00","18:00"],5:["12:00","18:00"],6:["10:00","18:00"],0:["10:00","18:00"]}, title:"Hassan Hajjaj & Acid Arab : My Rock Stars", who:"Installation photo et musique", place:"Cité de la musique – Philharmonie de Paris", arr:"19e", addr:"221 av. Jean-Jaurès", th:[], price:"12 € (réduit 6 à 10 €), réservation indispensable", st:"unknown", url:PF+"hassan-hajjaj-acid-arab-my-rock-stars-117980", desc:"Le panthéon musical du photographe marocain, mis en son par Acid Arab."}
+].map((e,i)=>({...e, id:"p"+i, v:"parisfr"}));
+
+
+/* Lieux et organisateurs proposés : acceptés, leurs conférences rejoignent l'agenda. */
+const SUGGESTIONS = [
+  {id:"m15", why:"Le festival gratuit de M, le magazine du Monde : conversations, lectures et projections avec des personnalités, dans plusieurs lieux du 9e et du 19e.",
+   venue:{name:"Festival des 15 ans de M", arr:"9e", addr:"Plusieurs lieux (9e et 19e)", url:"https://festival15ansdem.lemonde.fr/events/45-le-festival-15-ans-de-m", about:"Festival de M, le magazine du Monde.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-12", dEnd:"2026-11-15", t:"", title:"Le festival des 15 ans de M", who:"M, le magazine du Monde : Aya Nakamura, Amira Casar, Pio Marmaï, François Civil, Angèle…", v:"lemonde", place:"Plusieurs lieux (surtout 9e et 19e)", arr:"9e", addr:"Lycée Jules-Ferry, musée de la Vie romantique, Drouot, Max Linder Panorama, Bus Palladium…", th:[], price:"Gratuit sur réservation (déjeuner du dimanche 35 €)", free:true, st:"ok", url:"https://festival15ansdem.lemonde.fr/events/45-le-festival-15-ans-de-m", desc:"Conversations, lectures et projections : jeudi, la beauté avec Aya Nakamura ; vendredi, Amira Casar au musée de la Vie romantique et Matthieu Blazy (Chanel) à Drouot ; samedi, Pio Marmaï et François Civil ; dimanche, Angèle au Bus Palladium. Il reste quelques places."}
+   ]},
+  {id:"toutesl", why:"Festival littéraire de la Maison de la Poésie : plus de 40 rendez-vous, lectures-performances et rencontres avec des écrivains.",
+   venue:{name:"Paris en toutes lettres", arr:"3e", addr:"Maison de la Poésie, 157 rue Saint-Martin, et 10 lieux partenaires", url:"https://www.paris.fr/evenements/festival-paris-en-toutes-lettres-2026-127300", about:"Festival littéraire de novembre.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-11", dEnd:"2026-11-23", t:"", daily:true, title:"Paris en toutes lettres", who:"Laurent Gaudé, Chloé Delaume, Yannick Haenel, Léa Drucker, Yasmina Reza et Zabou Breitman…", v:"poesie", th:["litt"], price:"Selon les rendez-vous, réservation conseillée", st:"unknown", url:"https://www.paris.fr/evenements/festival-paris-en-toutes-lettres-2026-127300", desc:"Plus de 40 rendez-vous littéraires : lectures-performances, concerts littéraires, un bal et une sieste littéraire, à la Maison de la Poésie et dans dix lieux partenaires."}
+   ]},
+  {id:"cheries", why:"Festival de cinéma LGBTQIA+ : films, séances spéciales et rencontres avec les équipes.",
+   venue:{name:"Chéries-Chéris", arr:"", addr:"Cinémas parisiens", url:"https://parisienneries.fr/paris-culturel/paris-photo-wagner-cheries-cheris-novembre-2026/", about:"Festival du film LGBTQIA+ de Paris.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-14", dEnd:"2026-11-24", t:"", daily:true, title:"Chéries-Chéris", who:"32e festival du film LGBTQIA+ de Paris", v:"festparis", place:"Cinémas parisiens", th:[], price:"Voir le site", st:"unknown", url:"https://parisienneries.fr/paris-culturel/paris-photo-wagner-cheries-cheris-novembre-2026/", desc:"Longs et courts métrages, documentaires, séances spéciales et rencontres."}
+   ]},
+  {id:"surfskate", why:"Trois jours de films, d'expositions et de rencontres autour du surf et du skate, à la Gaîté Lyrique.",
+   venue:{name:"Paris Surf & Skateboard Film Festival", arr:"3e", addr:"Gaîté Lyrique, 3 bis rue Papin", url:"https://www.gaite-lyrique.net/agenda/festival/", about:"Festival de films de glisse.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-27", dEnd:"2026-11-29", t:"", title:"Paris Surf & Skateboard Film Festival", who:"11e édition", v:"gaite", th:[], price:"Voir le site", st:"unknown", url:"https://www.gaite-lyrique.net/agenda/festival/", desc:"Projections, expositions, librairie et rencontres autour du surf et du skate."}
+   ]},
+  {id:"streetpress", why:"Une journée de débats sur le journalisme et la politique avec un média indépendant, à la Gaîté Lyrique.",
+   venue:{name:"Festival StreetPress", arr:"3e", addr:"Gaîté Lyrique, 3 bis rue Papin", url:"https://www.gaite-lyrique.net/agenda/festival/", about:"Festival du média StreetPress.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-12-05", t:"10:00", end:"19:30", title:"Festival StreetPress", who:"Débats, projections, médias indépendants, puis concert", v:"gaite", th:["pol"], price:"Voir le site", st:"unknown", url:"https://www.gaite-lyrique.net/agenda/festival/", desc:"Tables rondes de la société civile et des médias indépendants, documentaires suivis de débats ; à 12h, « Le grand rendez-vous » : la France va-t-elle vers le fascisme ? Concert de rap engagé à 19h30."}
+   ]},
+  {id:"femis", why:"L'école de cinéma fête ses 40 ans : conférences et table ronde sur la musique de film.",
+   venue:{name:"La Fémis, 40 ans", arr:"3e", addr:"Gaîté Lyrique, 3 bis rue Papin", url:"https://www.gaite-lyrique.net/agenda/festival/", about:"Anniversaire de l'école de cinéma.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-12-11", t:"", title:"La Fémis, 40 ans de collaborations créatives", who:"L'école de cinéma fête ses 40 ans", v:"gaite", th:[], price:"Voir le site", st:"unknown", url:"https://www.gaite-lyrique.net/agenda/festival/", desc:"Conférences, table ronde sur la musique et le cinéma, puis concert et DJ set."}
+   ]},
+  {id:"corruption", why:"Festival de films sur la corruption, avec des débats menés par des associations anticorruption.",
+   venue:{name:"La Corruption en images", arr:"3e", addr:"Gaîté Lyrique, 3 bis rue Papin", url:"https://www.gaite-lyrique.net/agenda/festival/", about:"Festival de films et débats.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-12-12", t:"", title:"La Corruption en images", who:"Avec Anticor, Sherpa, Transparency International et Singa", v:"gaite", th:["pol"], price:"Voir le site", st:"unknown", url:"https://www.gaite-lyrique.net/agenda/festival/", desc:"Festival de films sur la corruption : projections, débats et remise d'un prix."}
+   ]},
+  {id:"closeup", why:"Cinéma, architecture et ville : une centaine de séances et de débats dans une trentaine de lieux.",
+   venue:{name:"Festival Close-Up", arr:"", addr:"Une trentaine de lieux à Paris et en Île-de-France", url:"https://unidivers.fr/festival-close-up-cinema-architecture-ville-pouvoir/", about:"Cinéma, architecture et ville : une centaine de séances et de rencontres.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-17", dEnd:"2026-11-24", t:"", daily:true, title:"Festival Close-Up : cinéma, architecture, ville et pouvoir", who:"6e édition, une centaine de séances", v:"closeup", cat:"Festival", th:[], price:"Selon les lieux", st:"unknown", url:"https://unidivers.fr/festival-close-up-cinema-architecture-ville-pouvoir/", desc:"Fictions, documentaires, ciné-concerts et rencontres. Temps forts à la Cité de l'architecture du 20 au 22 novembre."}
+   ]},
+  {id:"ripb", why:"Festival gratuit de cinéma et d'art contemporain, avec rencontres d'artistes.",
+   venue:{name:"Rencontres Internationales Paris/Berlin", arr:"", addr:"Jeu de Paume, Palais de Tokyo, MEP, Cité internationale des arts, musée de la Chasse", url:"https://www.art-action.org/", about:"Festival annuel cinéma et art contemporain, en entrée libre.", kind:"festival"},
+   events:[
+    {type:"fest", d:"2026-11-23", dEnd:"2026-11-29", t:"", daily:true, title:"Rencontres Internationales Paris/Berlin", who:"Festival cinéma et art contemporain", v:"ripb", cat:"Festival", th:[], price:"Gratuit (sauf séances au Jeu de Paume)", free:true, st:"libre", url:"https://www.paris.fr/evenements/les-rencontres-internationales-paris-berlin-2026-126378", desc:"Projections en avant-première, cartes blanches, rencontres et réalité virtuelle dans cinq lieux parisiens."}
+   ]},
+  {id:"jaures", why:"Think tank : débats politiques, société, Europe, histoire, presque chaque semaine en soirée.",
+   venue:{name:"Fondation Jean-Jaurès", arr:"9e", addr:"12 cité Malesherbes", url:"https://www.jean-jaures.org/evenements", about:"Think tank social-démocrate : rencontres-débats en soirée, sur inscription."},
+   events:[
+    {d:"2026-11-12", t:"18:30", end:"20:30", title:"Liberté d'expression, liberté de la presse, disparition du journalisme : où en est-on ?", who:"Débat", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/liberte-dexpression-liberte-de-la-presse-disparition-du-journalisme-ou-en-est-on/", desc:"État des libertés de la presse et avenir du journalisme."},
+    {d:"2026-11-16", t:"18:30", end:"20:30", title:"Que sommes-nous devenus ?", who:"Jérôme Fourquet et Ruben Rabinovitch", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/que-sommes-nous-devenus-rencontre-avec-jerome-fourquet-et-ruben-rabinovitch/", desc:"Le sondeur de L'Archipel français et un psychanalyste sur les transformations de la société française."},
+    {d:"2026-11-17", t:"19:00", end:"20:30", title:"La Commune à l'église !", who:"Rencontre", th:["hist","pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/rencontre-la-commune-a-leglise/", desc:"Rencontre d'histoire, au 16 rue des Écoles (5e)."},
+    {d:"2026-11-18", dEnd:"2026-11-19", t:"", sched:{3:["15:30","20:35"],4:["10:00","12:00"]}, eve:true, title:"Le Blue Labour et l'avenir des gauches européennes", who:"Avec la Revue politique et parlementaire", th:["pol","geo"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/le-blue-labour-et-lavenir-des-gauches-europeennes/", desc:"Mer. 18 : 15h30–20h35 (dernière table ronde 19h20) · jeu. 19 : 10h–12h. Deux journées sur le courant qui recompose le Parti travailliste britannique."},
+    {d:"2026-11-19", t:"18:30", end:"20:30", title:"Les travailleurs nocturnes. À la rencontre des cheminots de nuit", who:"Rencontre", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/les-travailleurs-nocturnes-a-la-rencontre-des-cheminots-de-nuit/", desc:"Le travail de nuit raconté par ceux qui le font."},
+    {d:"2026-11-23", t:"18:30", end:"20:30", title:"Comment retisser les liens de la cohésion républicaine ?", who:"Débat", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/%e2%81%a0%e2%81%a0comment-retisser-les-liens-de-la-cohesion-republicaine/", desc:"Fractures, défiance et pistes pour refaire société."},
+    {d:"2026-12-03", t:"09:30", end:"17:30", title:"C'était 1986", who:"Rencontre", th:["hist","pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/cetait-1986/", desc:"Retour sur une année politique charnière."},
+    {d:"2026-12-10", t:"18:30", end:"20:30", title:"Élargir l'Europe ? Quelle Union européenne voulons-nous bâtir ?", who:"Débat", th:["geo","pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.jean-jaures.org/agenda/elargir-leurope-quelle-union-europeenne-voulons-nous-batir/", desc:"Ukraine, Balkans, Moldavie : jusqu'où et comment élargir l'UE ?"}
+   ]},
+  {id:"bernardins", why:"Grandes soirées-débats à 19h30 : géopolitique, politique, éthique, IA, avec des invités de premier plan.",
+   venue:{name:"Collège des Bernardins", arr:"5e", addr:"20 rue de Poissy", url:"https://www.collegedesbernardins.fr/agenda", about:"Ancien collège cistercien devenu lieu de débats, de recherche et de culture."},
+   events:[
+    {d:"2026-11-23", t:"19:30", title:"Comment voulons-nous habiter le monde de demain ?", who:"Avec Clément Beaune, élus, architectes et théologiens", th:["eco","pol"], price:"Voir le site", st:"libre", url:"https://dioceseparis.fr/comment-voulons-nous-habiter-le.html", desc:"Autour de l'ouvrage collectif Habiter. Cycle « Politique : quelle promesse de bien commun »."},
+    {d:"2026-12-08", t:"19:30", title:"Le renseignement est-il une arme de paix ?", who:"Cycle géopolitique", th:["geo"], price:"Voir le site", st:"libre", url:"https://www.collegedesbernardins.fr/agenda/le-renseignement-est-il-une-arme-de-paix", desc:"Cyberattaques, influence, désinformation : quand le secret protège ou menace la paix."},
+    {d:"2026-12-10", t:"08:00", end:"18:00", title:"L'humanité en milieu numérique : penser l'IA autrement", who:"Colloque avec l'ICP et les Facultés Loyola", th:["philo","sci"], price:"6 €", st:"libre", url:"https://www.collegedesbernardins.fr/agenda/colloque-inter-institutionnel-l-humanite-en-milieu-numerique", desc:"Philosophie, sciences cognitives et théologie face à l'IA. En journée."}
+   ]},
+  {id:"comte", why:"Petite maison-musée du philosophe Auguste Comte : conférences et « Heure philo » très accessibles.",
+   venue:{name:"Maison d'Auguste Comte", arr:"6e", addr:"10 rue Monsieur-le-Prince", url:"http://www.augustecomte.org", about:"Appartement-musée du philosophe. Heure philo mensuelle avec Grégory Darbadie (4 €)."},
+   events:[
+    {d:"2026-11-24", t:"18:30", title:"Auguste Comte, de Paris au monde", who:"David Labreure, directeur de la Maison Auguste Comte", th:["philo","hist"], price:"Voir le site", st:"libre", url:"https://www.paris.fr/evenements/conference-auguste-comte-de-paris-au-monde-126069", desc:"Cycle « L'heure cultureG » de Mines-PSL, à la chapelle de l'Humanité, 5 rue Payenne (3e)."}
+   ]},
+  {id:"citesciences", why:"Pour le côté « et autres » : grand week-end d'astronomie grand public, plus de trente chercheurs.",
+   venue:{name:"Cité des sciences", arr:"19e", addr:"30 av. Corentin-Cariou", url:"https://www.cite-sciences.fr/", about:"Musée des sciences : conférences, planétarium, grands rendez-vous grand public."},
+   events:[
+    {d:"2026-11-13", dEnd:"2026-11-15", t:"", sched:{6:["10:00","19:00"],0:["09:00","17:30"]}, title:"Les Rencontres du ciel et de l'espace", who:"Association française d'astronomie", th:["sci"], price:"Billet dédié", st:"libre", url:"https://paris.fr/evenements/les-rencontres-du-ciel-et-de-l-espace-127010", desc:"Conférences de chercheurs, planétarium, ateliers météorites et observation du Soleil. Sur réservation."}
+   ]},
+  {id:"memorial", why:"Rencontres d'histoire en soirée et le dimanche, à petit prix : justice, mémoire, témoins.",
+   venue:{name:"Mémorial de la Shoah", arr:"4e", addr:"17 rue Geoffroy-l'Asnier", url:"https://www.memorialdelashoah.org/", about:"Musée et centre de documentation : projections, rencontres et lectures toute l'année."},
+   events:[
+    {d:"2026-11-12", t:"", title:"Une jeunesse dans le Yiddishland (2e partie)", who:"Documentaire de Jonathan Hayoun, avant-première", th:["hist","litt"], price:"3 à 5 €", st:"unknown", url:"https://www.paris.fr/evenements/une-jeunesse-dans-le-yiddishland-de-jonathan-hayoun-116655", desc:"1933-1939, l'âge des rêves brisés : la jeunesse juive d'Europe de l'Est racontée par ses propres récits. Mois du film documentaire."},
+    {d:"2026-11-19", t:"19:00", end:"21:00", title:"Filmer la justice", who:"Sylvie Lindeperg et Guillaume Moscovitz", th:["hist","pol"], price:"5 € · réduit 3 €", st:"unknown", url:"https://www.paris.fr/evenements/filmer-la-justice-ecrit-par-sylvie-lindeperg-realise-par-guillaume-moscovitz-116664", desc:"Avant-première puis rencontre : comment on a filmé les grands procès, de l'affaire Lindbergh au procès Barbie."},
+    {d:"2026-11-29", t:"14:30", end:"16:30", title:"70 ans du Mémorial du Martyr juif inconnu", who:"Historiens et archivistes du Mémorial", th:["hist"], price:"Gratuit, sur réservation", free:true, st:"unknown", url:"https://www.paris.fr/evenements/70e-anniversaire-du-memorial-du-martyr-juif-inconnu-devenu-memorial-de-la-shoah-116693", desc:"Un dimanche après-midi sur la naissance du lieu, inauguré en 1956, en images et en archives."},
+    {d:"2026-12-06", t:"15:00", end:"18:00", title:"Gare d'Osnabrück à Jérusalem", who:"Autour du livre d'Hélène Cixous", th:["litt","hist"], price:"5 € · réduit 3 €", st:"unknown", url:"https://unidivers.fr/event/gare-dosnabruck-a-jerusalem-memorial-de-la-shoah-paris-paris-2026-12-06t1600000100/", desc:"Projection et rencontre : la mémoire, l'oubli et la littérature face à l'Histoire."}
+   ]},
+  {id:"louvre", why:"La Chaire du Louvre : cinq soirées grand public de Bénédicte Savoy sur le musée, ses critiques et ses angles morts.",
+   venue:{name:"Auditorium du Louvre", arr:"1er", addr:"Auditorium Michel-Laclotte, sous la Pyramide", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", about:"Conférences, cycles et rencontres à 19h en semaine."},
+   events:[
+    {d:"2026-11-16", t:"19:00", title:"233 ans de controverses. Le Louvre et ses critiques depuis 1793", who:"Bénédicte Savoy – Chaire du Louvre", th:["hist"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", desc:"Première leçon : ce que l'on reproche au musée depuis sa naissance."},
+    {d:"2026-11-19", t:"19:00", title:"Trop voir, tout avoir. Le Louvre ou l'hybris de l'accumulation", who:"Bénédicte Savoy – Chaire du Louvre", th:["hist","philo"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", desc:"Le rêve de tout réunir en un seul lieu."},
+    {d:"2026-11-23", t:"19:00", title:"Voir et ne pas voir. Le Louvre et les angles morts du musée", who:"Bénédicte Savoy – Chaire du Louvre", th:["hist"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", desc:"Ce que le musée montre, et ce qu'il laisse dans l'ombre."},
+    {d:"2026-11-26", t:"19:00", title:"Extraire. Le Louvre et l'envers matériel du musée", who:"Bénédicte Savoy – Chaire du Louvre", th:["hist","eco"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", desc:"Pierres, métaux, transports : le coût matériel des collections."},
+    {d:"2026-11-30", t:"19:00", title:"Droit dans les yeux. Le Louvre en face", who:"Bénédicte Savoy – Chaire du Louvre", th:["hist"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/louvreplus/la-chaire-du-louvre", desc:"Dernière leçon du cycle."},
+    {d:"2026-12-12", t:"15:00", title:"Las hijas de Felipe", who:"Podcast enregistré en public", th:["hist"], price:"Voir le site", st:"unknown", url:"https://www.louvre.fr/", desc:"Un samedi après-midi autour des filles de Philippe II d'Espagne."}
+   ]},
+  {id:"forumimages", why:"Cinéma et débats : un cycle John Berger (Voir le voir) et un festival sur l'IA au service de l'humain.",
+   venue:{name:"Forum des images", arr:"1er", addr:"2 rue du Cinéma, Forum des Halles", url:"https://www.forumdesimages.fr/", about:"Cinémathèque de Paris : cycles, projections-rencontres, festivals."},
+   events:[
+    {d:"2026-11-13", dEnd:"2026-11-22", t:"", title:"Hommage à John Berger", who:"Cycle de projections et rencontres", th:["litt","philo"], price:"Tarif cinéma du Forum", pc:true, st:"unknown", url:"https://www.paris.fr/evenements/hommage-a-john-berger-nouveau-cycle-au-forum-des-images-126816", desc:"L'auteur de Voir le voir, entre art, politique et récit."},
+    {type:"fest", d:"2026-11-24", t:"", title:"We Are Human Festival : l'IA au service de l'humain", who:"Festival", th:["sci","philo"], price:"Voir le site", st:"unknown", url:"https://www.paris.fr/evenements/we-are-human-festival-l-ia-au-service-de-l-humain-126663", desc:"Tables rondes et projections sur une IA utile aux gens."}
+   ]},
+  {id:"fmsh", why:"Le cycle #Restitutions : faut-il rendre les objets d'art pris pendant la colonisation ? Débat clair, en soirée.",
+   venue:{name:"Fondation Maison des sciences de l'homme", arr:"6e", addr:"54 bd Raspail", url:"https://www.fmsh.fr/", about:"Rencontres de sciences humaines ouvertes au public, souvent gratuites."},
+   events:[
+    {d:"2026-11-12", t:"", title:"Vivre les enchères", who:"Présentation d'ouvrage", th:["econ"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.paris.fr/evenements/presentation-de-l-ouvrage-vivre-les-encheres-114986", desc:"Enquête au cœur des salles de vente."},
+    {d:"2026-11-17", t:"19:00", title:"#Restitutions : les objets d'art en question", who:"Avec Emmanuel Kasarhérou (quai Branly)", th:["hist","pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://www.paris.fr/evenements/restitutions-les-archives-en-question-117281", desc:"Cycle « #Restitutions. Une autre définition du monde »."}
+   ]},
+  {id:"bhvp", why:"Bibliothèque de la Ville, gratuite : histoire de Paris, littérature, tables rondes intimistes.",
+   venue:{name:"Bibliothèque historique de la Ville de Paris", arr:"4e", addr:"24 rue Pavée", url:"https://www.paris.fr/evenements/programmation-culturelle-de-la-bibliotheque-historique-de-la-ville-de-paris-52150", about:"Hôtel Lamoignon, au Marais. Rencontres en entrée libre."},
+   events:[
+    {d:"2026-11-17", t:"", title:"Le chocolat chaud de Madame de Sévigné", who:"Rencontre", th:["hist","litt"], price:"Gratuit", free:true, st:"libre", url:"https://www.paris.fr/evenements/programmation-culturelle-de-la-bibliotheque-historique-de-la-ville-de-paris-52150", desc:"Histoire d'une boisson à la mode au Grand Siècle."},
+    {d:"2026-12-08", t:"", title:"Léon-Paul Fargue en toutes langues", who:"Lectures et traductions", th:["litt"], price:"Gratuit", free:true, st:"libre", url:"https://www.paris.fr/evenements/leon-paul-fargue-en-toutes-langues-125754", desc:"Le « piéton de Paris » lu dans plusieurs langues."},
+    {d:"2026-12-09", t:"", title:"Histoire ouvrière, histoires d'ouvrières", who:"Table ronde", th:["hist","pol"], price:"Gratuit", free:true, st:"libre", url:"https://www.paris.fr/evenements/table-ronde-histoire-ouvriere-histoire-d-ouvrieres-126214", desc:"La place des femmes dans l'histoire du travail."}
+   ]},
+  {id:"uparis", why:"Université Ouverte et Circle U. : conférences pour tous sur la liberté académique, la société, l'économie.",
+   venue:{name:"Université Paris Cité", arr:"13e", addr:"Campus Grands Moulins, 5 rue Thomas-Mann", url:"https://u-paris.fr/universite-ouverte/", about:"Cours et conférences ouverts à tous, sur inscription."},
+   events:[
+    {d:"2026-11-17", t:"", title:"Liberté académique", who:"Éric Fassin", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://u-paris.fr/", desc:"Cycle du mardi sur la liberté de chercher et d'enseigner."},
+    {d:"2026-11-19", t:"17:30", title:"Conférence de Susan Paulson", who:"Anthropologue (masculinités, décroissance)", th:["eco"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://u-paris.fr/", desc:"Cycle Circle U."},
+    {d:"2026-12-01", t:"", title:"Liberté académique (suite du cycle)", who:"Rencontre", th:["pol"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://u-paris.fr/", desc:"Nouvelle séance du cycle du mardi."},
+    {d:"2026-12-03", t:"17:00", title:"Conférence de Grace Ballor", who:"Historienne de l'économie", th:["econ","hist"], price:"Gratuit, sur inscription", free:true, pc:true, st:"libre", url:"https://u-paris.fr/", desc:"Cycle Circle U."}
+   ]},
+  {id:"mcjp", why:"Pour comprendre le Japon d'aujourd'hui : un samedi « Décoder le Japon » et des rencontres d'artistes.",
+   venue:{name:"Maison de la culture du Japon", arr:"15e", addr:"101 bis quai Jacques-Chirac", url:"https://www.mcjp.fr/", about:"Conférences, cinéma et spectacles autour du Japon."},
+   events:[
+    {d:"2026-11-12", t:"", title:"New Talents", who:"Rencontre avec de jeunes créateurs", th:["litt"], price:"Voir le site", st:"unknown", url:"https://www.mcjp.fr/", desc:"La jeune création japonaise présentée par ses auteurs."},
+    {d:"2026-11-28", t:"", title:"Décoder le Japon", who:"Conférence", th:["geo"], price:"Voir le site", st:"unknown", url:"https://www.mcjp.fr/", desc:"Société, politique et culture du Japon contemporain, expliquées simplement."}
+   ]},
+  {id:"citearchi", why:"Pendant le festival Close-Up : projections-débats sur la ville et le pouvoir, le week-end.",
+   venue:{name:"Cité de l'architecture et du patrimoine", arr:"16e", addr:"1 place du Trocadéro", url:"https://www.citedelarchitecture.fr/fr/agenda", about:"Conférences, débats et ciné-rencontres sur la ville, au Trocadéro."},
+   events:[
+    {d:"2026-11-21", t:"16:00", title:"The Competition : qui décide de l'architecture ?", who:"Rencontre avec Margaux Darrieus, Françoise Fromonot et Loïse Lenne", th:["pol"], price:"Voir le site", st:"unknown", url:"https://unidivers.fr/festival-close-up-cinema-architecture-ville-pouvoir/", desc:"Projection d'un documentaire sur un concours d'architecture, puis débat."},
+    {d:"2026-11-22", t:"14:30", title:"Téhéran, la ville derrière les images", who:"Ciné-conférence de Mina Saidi Sharouz", th:["geo"], price:"Voir le site", st:"unknown", url:"https://unidivers.fr/festival-close-up-cinema-architecture-ville-pouvoir/", desc:"Lire une ville à travers son cinéma."}
+   ]},
+  {id:"orsay", why:"Pour les 40 ans du musée : un procès théâtralisé avec une philosophe, et Catherine Meurisse en grande invitée.",
+   venue:{name:"Musée d'Orsay", arr:"7e", addr:"Esplanade Valéry-Giscard-d'Estaing", url:"https://www.musee-orsay.fr/fr/programme/agenda", about:"Auditorium : conférences, rencontres et spectacles."},
+   events:[
+    {d:"2026-11-26", t:"20:00", title:"Orsay à la barre", who:"Les jeunes avocats de la Conférence de Paris, avec Laurence Devillairs", th:["philo","hist"], price:"15 € · adhérent 12 €", st:"ok", url:"https://www.musee-orsay.fr/fr/programme/agenda/evenements/orsay-la-barre", desc:"Un procès joué pour interroger la façon dont le musée raconte le passé."},
+    {d:"2026-12-06", t:"17:00", title:"Grande invitée : Catherine Meurisse", who:"Dessinatrice", th:["litt"], price:"Gratuit avec un billet du musée", st:"soon", url:"https://www.musee-orsay.fr/fr/programme/agenda/evenements/grande-invitee-catherine-meurisse", desc:"L'autrice des Grands Espaces et de Delacroix parle de son rapport à l'art. Réservation bientôt ouverte."},
+    {d:"2026-12-16", t:"", title:"L'Aventure des collections #3 : arts décoratifs", who:"Conférence tout public", th:["hist"], price:"Voir le site", st:"unknown", url:"https://www.musee-orsay.fr/fr/programme/agenda/cycles/laventure-des-collections", desc:"Troisième séance du cycle (la deuxième affiche complet)."}
+   ]},
+  {id:"shakespeare", why:"Librairie anglophone mythique : rencontres gratuites avec des auteurs, souvent politiques.",
+   venue:{name:"Shakespeare and Company", arr:"5e", addr:"37 rue de la Bûcherie", url:"https://www.shakespeareandcompany.com/events", about:"Rencontres en anglais, gratuites. Places limitées : arriver tôt."},
+   events:[
+    {d:"2026-11-26", t:"19:00", title:"Ece Temelkuran on Nation of Strangers", who:"Ece Temelkuran (en anglais)", th:["pol","litt"], price:"Gratuit", free:true, st:"libre", url:"https://www.shakespeareandcompany.com/events/ece-temelkuran-on-nation-of-strangers", desc:"L'essayiste turque, autrice de Comment conduire un pays à sa perte, sur l'exil et l'appartenance."}
+   ]},
+  {id:"bpi", why:"Programme « Vies minuscules » : lectures, films et rencontres autour des existences ordinaires.",
+   venue:{name:"Bpi – Bibliothèque publique d'information", arr:"12e", addr:"Lumière, 40 av. des Terroirs-de-France", url:"https://www.bpi.fr/", about:"La bibliothèque du Centre Pompidou, installée à Bercy pendant les travaux."},
+   events:[
+    {d:"2026-11-11", dEnd:"2026-11-22", t:"", title:"Vies minuscules, des vies à la Bpi", who:"Avec Mehdi Meklat et Badroudine Saïd Abdallah", th:["litt"], price:"Gratuit", free:true, pc:true, st:"libre", url:"https://www.paris.fr/evenements/vies-minuscules-des-vies-a-la-bpi-126768", desc:"Programme en cours jusqu'au 22 novembre, en écho à l'exposition du Panthéon."}
+   ]},
+  {id:"cnam", why:"Conférences grand public d'un grand établissement scientifique, en entrée libre.",
+   venue:{name:"Cnam", arr:"3e", addr:"292 rue Saint-Martin", url:"https://www.cnam.fr/", about:"Les Jeudis du Cnam et des rencontres ouvertes à tous."},
+   events:[
+    {d:"2026-11-27", t:"14:00", end:"17:00", title:"L'effet Matilda ou les femmes scientifiques", who:"Conférence", th:["sci","hist"], price:"Gratuit", free:true, pc:true, st:"libre", url:"https://agenda-des-sorties.com/detail.php?id=348235", desc:"Pourquoi l'histoire a effacé tant de découvertes faites par des femmes. En journée."}
+   ]},
+  {id:"invalides", why:"Pour l'histoire et la défense : colloque ouvert au public aux Invalides.",
+   venue:{name:"Musée de l'Armée – Invalides", arr:"7e", addr:"129 rue de Grenelle", url:"https://www.musee-armee.fr/", about:"Colloques, conférences et concerts dans l'Hôtel des Invalides."},
+   events:[
+    {d:"2026-11-25", t:"09:00", end:"16:30", title:"L'identité militaire du gendarme", who:"Colloque du musée de la Gendarmerie", th:["hist","pol"], price:"Voir le site", st:"unknown", url:"https://www.gendarmerie.interieur.gouv.fr/musee/agenda-culturel/evenements/expo-colloque-l-identite-militaire-du-gendarme", desc:"Auditorium Austerlitz. En journée."}
+   ]},
+  {id:"cafephilo", why:"Un café philo convivial, en anglais, dans un café mythique de Saint-Germain.",
+   venue:{name:"Café philo du Café de Flore", arr:"6e", addr:"172 bd Saint-Germain", url:"https://www.meetup.com/english-cafe-philo-in-paris/", about:"Discussion philosophique ouverte à tous, en anglais. Consommation à prévoir."},
+   events:[
+    {d:"2026-12-02", t:"", title:"Paris Café Philo", who:"Discussion en anglais", th:["philo"], price:"Gratuit (consommation)", free:true, st:"libre", url:"https://www.meetup.com/english-cafe-philo-in-paris/", desc:"Le sujet est choisi par les participants. Horaire sur Meetup."}
+   ]},
+  {id:"petitpalais", why:"Pauses culturelles à l'heure du déjeuner sur l'histoire de Paris et de Bruxelles.",
+   venue:{name:"Petit Palais", arr:"8e", addr:"Avenue Winston-Churchill", url:"https://www.petitpalais.paris.fr/", about:"Auditorium du musée des Beaux-Arts de la Ville de Paris."},
+   events:[
+    {d:"2026-11-27", t:"12:30", title:"Paris-Bruxelles", who:"Cycle du Comité d'histoire de la Ville de Paris", th:["hist"], price:"Gratuit", free:true, pc:true, st:"libre", url:"https://www.petitpalais.paris.fr/", desc:"Première séance d'un cycle sur deux capitales liées. À 12h30."}
+   ]},
+  {id:"museum", why:"Côté sciences : un chercheur du Muséum qui explique la science de nos assiettes.",
+   venue:{name:"Muséum national d'histoire naturelle", arr:"5e", addr:"57 rue Cuvier", url:"https://www.mnhn.fr/", about:"Conférences grand public au Jardin des plantes."},
+   events:[
+    {d:"2026-11-17", t:"", title:"Rencontre avec Christophe Lavelle", who:"Chercheur au CNRS et au Muséum", th:["sci"], price:"Voir le site", st:"unknown", url:"https://www.mnhn.fr/", desc:"La chimie et la physique de la cuisine, expliquées simplement."}
+   ]},
+  {id:"chedid", why:"Les bibliothèques de la Ville proposent des conférences gratuites le samedi.",
+   venue:{name:"Bibliothèque Andrée-Chedid", arr:"15e", addr:"36 rue Émeriau", url:"https://www.paris.fr/lieux/bibliotheque-andree-chedid-1729", about:"Conférences cinéma, musique et littérature en entrée libre."},
+   events:[
+    {d:"2026-12-12", t:"15:30", end:"17:00", title:"Agatha Christie portée à l'écran", who:"Conférence cinéma des bibliothécaires", th:["litt"], price:"Gratuit", free:true, st:"libre", url:"https://unidivers.fr/event/agatha-christie-portee-a-lecran-bibliotheque-andree-chedid-paris-paris-2026-12-12t1630000100/", desc:"Des romans aux films et séries."}
+   ]},
+  {id:"branly", why:"Pour l'ailleurs : théâtre documentaire sur le Grand Nord et un Noël festif et gratuit.",
+   venue:{name:"Musée du quai Branly – Jacques-Chirac", arr:"7e", addr:"37 quai Branly", url:"https://www.quaibranly.fr/", about:"Théâtre Claude-Lévi-Strauss : rencontres, colloques, université populaire."},
+   events:[
+    {d:"2026-11-14", t:"18:30", title:"Aalaapi", who:"Théâtre documentaire inuit (Laurence Dauphinais)", th:["geo"], price:"25 € · réduit 15 €", st:"unknown", url:"https://www.offi.fr/theatre/theatre-claude-levi-strauss-5424/aalaapi-108587.html", desc:"Entre théâtre et radio, un Grand Nord raconté de l'intérieur. Aussi à 15h."},
+    {d:"2026-12-27", t:"", title:"Un autre Noël", who:"Journée festive", th:["geo"], price:"Gratuit", free:true, st:"libre", url:"https://www.quaibranly.fr/", desc:"Fêter Noël autrement, autour des cultures du monde."}
+   ]},
+  {id:"arcueil", why:"Juste après le périphérique (RER B) : une université populaire avec des débats de société, gratuits, le mardi à 20h.",
+   venue:{name:"Université populaire d'Arcueil", arr:"Arcueil", addr:"Arcueil (94), RER B Laplace", url:"https://www.fest.fr/agenda/paris/paris-12e/conferences-forums-et-debats", about:"Conférences-débats en entrée libre, sans réservation."},
+   events:[
+    {d:"2026-12-01", t:"20:00", title:"Quelles transitions pour nos mobilités d'ici 2050 ?", who:"Conférence-débat", th:["eco"], price:"Gratuit", free:true, st:"libre", url:"https://www.fest.fr/agenda/paris/paris-12e/conferences-forums-et-debats", desc:"Voiture, train, vélo : comment se déplacera-t-on demain ?"},
+    {d:"2026-12-15", t:"20:00", title:"Conférence-débat de l'Université populaire", who:"Sujet de société", th:["pol"], price:"Gratuit", free:true, st:"libre", url:"https://www.fest.fr/agenda/paris/paris-12e/conferences-forums-et-debats", desc:"Dernière séance de l'année."}
+   ]},
+  {id:"iic", why:"Rencontres littéraires et débats sur l'Italie, gratuits, dans un hôtel particulier du 7e.",
+   venue:{name:"Institut culturel italien", arr:"7e", addr:"50 rue de Varenne", url:"https://iicparigi.esteri.it/", about:"Rencontres d'écrivains, débats et expositions, entrée libre sur réservation."},
+   events:[
+    {d:"2026-11-12", dEnd:"2027-01-22", t:"", title:"Magnifica Humanitas – Matteo Basilé", who:"Exposition photo", th:["litt"], price:"Gratuit", free:true, st:"libre", url:"https://75.agendaculturel.fr/exposition/magnifica-humanitas-matteo-basile.html", desc:"Portraits sur la condition humaine. Pour les rencontres, voir l'agenda de l'Institut."}
+   ]},
+  {id:"cernuschi", why:"Musée des arts de l'Asie : conférences « L'Université au musée » autour de l'exposition Corée.",
+   venue:{name:"Musée Cernuschi", arr:"8e", addr:"7 av. Vélasquez", url:"https://www.cernuschi.paris.fr/fr/activites-et-evenements", about:"Conférences d'universitaires, accessibles, autour des expositions."},
+   events:[
+    {d:"2026-11-20", dEnd:"2027-04-04", t:"", title:"Corée. Le royaume des lettrés (1600-1900)", who:"Exposition", th:["hist"], price:"Réduit 8 € · gratuit -18 ans", st:"libre", url:"https://parisjetaime.com/evenement/exposition-coree-e2622", desc:"Le quotidien des lettrés de la dynastie Joseon. Conférences associées sur le site du musée."}
+   ]},
+  {id:"portestmartin", why:"Le Live Magazine des droits humains d'Amnesty International : journalistes, photographes et artistes racontent sur scène des histoires vraies. Un soir par an.",
+   venue:{name:"Théâtre de la Porte Saint-Martin", arr:"10e", addr:"18 bd Saint-Martin", url:"https://www.portestmartin.com/live-magazine", about:"Grand théâtre privé qui accueille aussi des soirées-événements comme le Live Magazine."},
+   events:[
+    {d:"2026-12-08", t:"20:00", title:"Live Magazine des droits humains", who:"Amnesty International et Live Magazine", th:["geo","pol"], price:"Dès 15 €", st:"unknown", url:"https://billetterie.portestmartin.fr/fr/manifestation/106/_live_magazine_des_droits_humains", desc:"Un « journal vivant » d'environ 1h30, sans captation ni replay. Les éditions précédentes commençaient à 20h."}
+   ]},
+  {id:"lucernaire", why:"Ses « Grands entretiens » : une heure avec un écrivain, suivie d'une dédicace. Format proche d'une conférence littéraire.",
+   venue:{name:"Le Lucernaire", arr:"6e", addr:"53 rue Notre-Dame-des-Champs", url:"https://www.lucernaire.fr/", about:"Théâtre, cinéma, librairie et restaurant ; rencontres littéraires régulières avec Actes Sud et d'autres éditeurs."},
+   events:[
+    {d:"2026-12-01", t:"19:30", end:"20:45", title:"Grand entretien avec Alice Ferney", who:"Avec les éditions Actes Sud", th:["litt"], price:"10 à 15 €, sur réservation", st:"unknown", url:"https://www.paris.fr/evenements/grand-entretien-avec-alice-ferney-126787", desc:"La romancière revient sur son œuvre, des grandes fresques historiques aux récits intimes. Les grands entretiens ont lieu en général en soirée vers 19h30."}
+   ]},
+  {id:"tedxmontmartre", why:"Une soirée TEDx ouverte au public : des conférences courtes et accessibles sur des sujets variés.",
+   venue:{name:"TEDxMontmartre", arr:"18e", addr:"Lieu à confirmer", url:"https://www.ted.com/tedx/events/69108", about:"Événement TEDx organisé localement."},
+   events:[
+    {d:"2026-11-17", t:"", title:"TEDxMontmartre", who:"Conférences courtes", th:["philo","sci"], price:"Voir le site", st:"unknown", url:"https://www.ted.com/tedx/events/69108", desc:"Programme, horaire et lieu exact sur la page de l'événement."}
+   ]},
+  {id:"mpaa", why:"L'Apéro littéraire : découvrir des textes d'autrices de théâtre d'aujourd'hui et en discuter autour d'un verre.",
+   venue:{name:"MPAA / Breguet", arr:"11e", addr:"Maison des pratiques artistiques amateurs, rue Breguet", url:"https://www.paris.fr/evenements/apero-litteraire-123870", about:"Lieu de la Ville de Paris : rencontres avec des auteurs de théâtre."},
+   events:[
+    {d:"2026-12-11", t:"19:30", end:"21:30", title:"Apéro littéraire", who:"Avec Sarah Pèpe (compagnie Vent Debout)", th:["litt"], price:"Gratuit, sur réservation", free:true, st:"unknown", url:"https://www.paris.fr/evenements/apero-litteraire-123870", desc:"Lectures d'extraits et échanges, un vendredi soir. Cycle jusqu'en avril 2027."}
+   ]},
+  {id:"radiofrance", why:"Assister gratuitement à l'enregistrement d'émissions comme Le Masque et la Plume, au studio 104. Les dates ne sont publiées que quelques semaines avant.",
+   venue:{name:"Maison de la Radio et de la Musique", arr:"16e", addr:"116 av. du Président-Kennedy", url:"https://www.maisondelaradioetdelamusique.fr/", about:"Enregistrements publics de France Inter et France Culture, gratuits sur réservation."},
+   events:[]},
+  {id:"plateaux", why:"Accueille les « Grand Reporterre » : un journaliste et des artistes mettent en scène une enquête d'actualité. Prochaine édition à Paris fin avril 2027.",
+   venue:{name:"Les Plateaux Sauvages", arr:"20e", addr:"5 rue des Plâtrières", url:"https://75.agendaculturel.fr/theatre/la-terre-parle-quand-on-la-creuse-grand-reporterre-6.html", about:"Lieu culturel de la Ville : théâtre documentaire et formes entre journalisme et scène."},
+   events:[]},
+  {id:"colline", why:"Programme des formes proches du débat, comme « Rituel 4 : Le Grand Débat » d'Émilie Rousset et Louise Hémon (février-mars 2027).",
+   venue:{name:"La Colline – théâtre national", arr:"20e", addr:"15 rue Malte-Brun", url:"https://www.colline.fr/", about:"Théâtre national tourné vers les écritures contemporaines et la société."},
+   events:[]},
+  {id:"carreau", why:"Comme le Lucernaire, un lieu culturel qui programme de vraies rencontres-débats : le cycle « Menaces sur l'État de droit ! » animé par Salomé Saqué (gratuit), des tables rondes après les spectacles.",
+   venue:{name:"Le Carreau du Temple", arr:"3e", addr:"2 rue Perrée", url:"https://www.lecarreaudutemple.eu/", about:"Halle culturelle et sportive du Haut-Marais : spectacles, festivals, rencontres."},
+   events:[
+    {d:"2026-11-20", t:"", title:"Focus Justice des mineurs", who:"Spectacle de Sonia Chiambretto, film de Thibaud Croisy, puis table ronde", th:["pol"], price:"Débat en entrée libre · spectacle + film 11 à 22 €", st:"libre", url:"https://unidivers.fr/event/focus-justice-des-mineurs-sonia-chiambretto-thibaud-croisy-au-carreau-du-temple-le-carreau-du-temple-paris-paris-2026-11-20t1530000100/", desc:"Pour la Journée des droits de l'enfant : la réalité des jeunes en centres éducatifs fermés, de 14h30 à 21h30."},
+    {d:"2026-11-24", t:"19:00", end:"20:30", title:"Être LGBTQIA+ dans un monde autoritaire", who:"Cycle « Menaces sur l'État de droit ! » animé par Salomé Saqué", th:["pol"], price:"Gratuit", free:true, st:"libre", url:"https://www.paris.fr/evenements/menaces-sur-l-etat-de-droit-cycle-de-rencontres-avec-salome-saque-au-carreau-du-temple-116312", desc:"Invisibilisation, attaques et résistances. Deuxième des six rencontres du cycle (suivantes : janvier à mai 2027)."}
+   ]},
+  {id:"alliance", why:"Organise des discussions grand public autour d'essais récents, gratuites, dans son auditorium du boulevard Raspail.",
+   venue:{name:"Alliance française de Paris", arr:"6e", addr:"101 bd Raspail", url:"https://www.alliancefr.org/", about:"École de langue qui accueille aussi conférences et rencontres ouvertes à tous."},
+   events:[
+    {d:"2026-11-20", t:"19:00", end:"21:00", title:"Éloge du désaccord", who:"Aida Tavakoli, Saena Delacroix-Sadighiyan et Bruno Frère", th:["philo","pol"], price:"Gratuit, réservation conseillée", free:true, st:"libre", url:"https://www.paris.fr/evenements/eloge-du-desaccord-127001", desc:"Et si le désaccord était une condition de notre liberté ? Autour d'« Éloge du désaccord » et de « Pour une démocratie sauvage »."}
+   ]},
+  {id:"cesure", why:"Tiers-lieu « des savoirs inattendus » dans l'ancien campus Censier : journées d'étude, rencontres et débats ouverts à tous.",
+   venue:{name:"Césure", arr:"5e", addr:"13 rue Santeuil", url:"https://www.cesure.paris/", about:"Tiers-lieu de Plateau Urbain et Yes We Camp, face au Jardin des plantes.", kind:"tiers"},
+   events:[]},
+  {id:"canaux", why:"Tiers-lieu de l'économie sociale et solidaire au bord du bassin de la Villette : débats avec l'Institut Rousseau, Café Paris Recherche avec des chercheurs.",
+   venue:{name:"La Maison des Canaux", arr:"19e", addr:"6 quai de la Seine (métro Stalingrad)", url:"https://www.sortiraparis.com/en/lieux/82888-house-of-canals", about:"Maison des économies solidaires et innovantes.", kind:"tiers"},
+   events:[]},
+  {id:"grandecoco", why:"Nouveau tiers-lieu du 20e consacré à la ville durable : conférences, rencontres et soirées à venir.",
+   venue:{name:"La Grande Coco", arr:"20e", addr:"29 rue du Soleil (métro Télégraphe)", url:"https://www.paris.fr/pages/bienvenue-a-la-grande-coco-le-tiers-lieu-qui-reinvente-la-ville-et-un-peu-la-vie-33267", about:"Tiers-lieu ouvert fin 2025 : café, coworking, conférences.", kind:"tiers"},
+   events:[]},
+  {id:"groundcontrol", why:"Grand tiers-lieu près de la gare de Lyon : soirées thématiques, podcasts en public, ateliers sur la ville.",
+   venue:{name:"Ground Control", arr:"12e", addr:"81 rue du Charolais", url:"https://www.groundcontrolparis.com/", about:"Halle festive et culturelle.", kind:"tiers"},
+   events:[]},
+  {id:"pointephemere", why:"Au bord du canal Saint-Martin, accueille des talks en public comme les « Popol Live » de Léa Chamboncel avec des journalistes et militants.",
+   venue:{name:"Point Éphémère", arr:"10e", addr:"200 quai de Valmy", url:"https://www.pointephemere.org/", about:"Centre de dynamiques artistiques : concerts, expos, talks.", kind:"tiers"},
+   events:[]},
+  {id:"montenlair", why:"Librairie-galerie de Ménilmontant : rencontres régulières avec des auteurs, des éditeurs et des commissaires d'expo.",
+   venue:{name:"Le Monte-en-l'air", arr:"20e", addr:"2 rue de la Mare", url:"https://www.montenlair.fr/", about:"Librairie indépendante et galerie.", kind:"librairie"},
+   events:[]},
+  {id:"violette", why:"Librairie féministe et LGBT de la rue de Charonne : rencontres et débats autour d'essais.",
+   venue:{name:"Violette and Co", arr:"11e", addr:"102 rue de Charonne", url:"https://www.violetteandco.com/", about:"Librairie indépendante.", kind:"librairie"},
+   events:[]},
+  {id:"libinstitut", why:"Librairie de l'Institut de France : rencontres avec historiens et académiciens (récemment autour de Jankélévitch avec Pascal Ory).",
+   venue:{name:"Librairie de l'Institut", arr:"6e", addr:"23 quai de Conti", url:"https://www.parislibrairies.fr/agenda.php", about:"Librairie de sciences humaines face au Louvre.", kind:"librairie"},
+   events:[]}
+];
+
+
+/* Prix relevés le 10 novembre. pc = prix habituel du lieu, pas affiché sur la page de l'événement. */
+const MK2C = "Carte 5 : 14,90 €/place · à l'unité sur mk2.com";
+const PRICES = {
+  "Nous Présidentes – émission en public":{p:"Payant · prix sur mk2.com (hors carte 5)"},
+  "La philosophie comme art de vivre":{p:"Payant · prix sur la billetterie de La Maison des Sagesses"},
+  "L'anti-conférence philo : l'art":{p:"Prix non communiqué · réservation sur nanna-paris.fr"},
+  "L'Agora stoïcienne":{p:"Gratuit, sur réservation", free:true},
+  "Dernières nouvelles du cosmos":{p:MK2C},
+  "Peut-on rêver d'équité au travail ?":{p:MK2C},
+  "Ni muses ni soumises":{p:MK2C},
+  "Les animaux ont-ils une psychologie ?":{p:MK2C},
+  "Rester célibataire":{p:MK2C},
+  "Au cœur de l'enquête":{p:MK2C},
+  "Croire en la justice":{p:MK2C},
+  "Cinquante nuances de postcapitalisme":{p:MK2C},
+  "La technologie pense-t-elle à notre place ?":{p:MK2C},
+  "La foi peut-elle être un choix ?":{p:"19 € · -26 ans et étudiants 9 €"},
+  "La lutte des classes passe-t-elle par l'assiette ?":{p:"19,90 € · -26 ans 9,90 €"},
+  "Qu'est-ce que l'état du monde fait à l'économie ?":{p:"Livre + conférence 31,80 € · abonnés UGC/mk2 12,90 €"},
+  "Climat : jeunes et seniors se mobilisent ensemble":{p:"Gratuit", free:true},
+  "Voyage en 2030 Glorieuses":{p:"Gratuit", free:true},
+  "Les nouvelles pratiques du journalisme (#NPDJ)":{p:"Gratuit, sur inscription", free:true},
+  "Le Collège à la Bibliothèque":{p:"Gratuit, réservation conseillée", free:true},
+  "Savants et charlatans : le cas Mesmer":{p:"Gratuit, réservation conseillée", free:true},
+  "De la philosophie aux mathématiques : l'intelligence pas si artificielle":{p:"Gratuit, réservation conseillée", free:true},
+  "Michel Foucault au Collège de France":{p:"Gratuit, sans inscription", free:true},
+  "Festival de la non-violence":{p:"Prix libre"},
+  "Quand les scénaristes de fiction écrivent la politique":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "La démocratie pour tous : peut-on encore faire confiance ?":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Festival Le Fun !":{p:"De gratuit à 25 € selon les séances", pc:true},
+  "Rencontre croisée d'écrivains":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Un Libanais à Paris":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Debout dans tes rêves":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "L'Alhambra, laboratoire d'idées":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Averroès : 900 ans de pensée vivante et universelle":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Rencontre croisée d'autrices":{p:"Gratuit, sur réservation", free:true, pc:true},
+  "Le Sud global, un acteur géopolitique ?":{p:"30 €", free:false},
+  "Où va la guerre d'Iran ?":{p:"30 €", free:false},
+  "Qu'est-ce qu'une frontière ?":{p:"30 €", free:false},
+  "La fin de la domination occidentale ?":{p:"Gratuit", free:true, pc:true},
+  "Amazonie : du mythe de la forêt vierge aux enjeux de notre avenir":{p:"Prix sur HelloAsso"},
+  "Mi Livre Mi Raisin":{p:"Prix non communiqué"},
+  "Les Rencontres du ciel et de l'espace":{p:"18 € la journée · 25 € 2 jours · 33 € 3 jours"},
+  "L'humanité en milieu numérique : penser l'IA autrement":{p:"6 €"},
+  "Comment voulons-nous habiter le monde de demain ?":{p:"Prix sur le site des Bernardins"},
+  "Le renseignement est-il une arme de paix ?":{p:"Prix sur le site des Bernardins"},
+  "Auguste Comte, de Paris au monde":{p:"Gratuit", free:true, pc:true}
+};
+const applyPrice = e => { const x = PRICES[e.title]; if(!x) return e;
+  const o = {...e, price:x.p, pc:!!x.pc}; if(x.free!==undefined) o.free = x.free; return o; };
+
+/* ---------- réglages de l'utilisateur ---------- */
+let USER = {hiddenVenues:[], customVenues:[], customEvents:[], hours:{on:true, from:"18:30"}};
+try{ Object.assign(USER, JSON.parse(document.getElementById("user-data").textContent)); }catch(_){}
+let LOCAL_ONLY = false;
+try{ const loc = JSON.parse(localStorage.getItem("sp-user")||"null"); if(loc && loc.savedAt > (USER.savedAt||0)) USER = loc; }catch(_){}
+
+if(!USER.hours) USER.hours = {on:true, from:"18:30"};
+if(!USER.hiddenEvents) USER.hiddenEvents = [];
+if(!USER.acceptedSugs) USER.acceptedSugs = [];
+if(!USER.rejectedSugs) USER.rejectedSugs = [];
+/* Clé stable d'un événement (date + titre), pour qu'un masquage survive aux mises à jour du programme. */
+const ekey = e => e.mine ? e.id : e.d+"|"+e.title;
+const WEEKLY = (()=>{ try{ return JSON.parse(document.getElementById("weekly-data").textContent); }catch(_){ return {events:[],runs:[]}; } })();
+(WEEKLY.sugs||[]).forEach(x=>{ if(x && x.id && x.venue && !SUGGESTIONS.some(y=>y.id===x.id)) SUGGESTIONS.push({why:"", events:[], ...x}); });
+const isFresh = e => e.added && (parse(TODAY)-parse(e.added))/864e5 <= 8;
+let VENUES = {}, E = [], HIDDEN_E = [];
+function rebuild(){
+  VENUES = {...BASE_VENUES};
+  USER.customVenues.forEach(v=>VENUES[v.id]={...v, mine:true});
+  const sugEvents = [];
+  SUGGESTIONS.filter(s=>USER.acceptedSugs.includes(s.id)).forEach(s=>{
+    VENUES["s-"+s.id] = {...s.venue, accepted:true};
+    s.events.forEach((e,i)=>sugEvents.push({...e, id:"s-"+s.id+"-"+i, v:"s-"+s.id, type:e.type||"conf"}));
+  });
+  const hidden = new Set(USER.hiddenVenues);
+  /* événements trouvés par la veille hebdomadaire (sans doublon avec le programme déjà saisi) */
+  const nrm = x => String(x||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+  const seen = new Set([...BASE_EVENTS, ...EXC_EVENTS, ...PF_EVENTS, ...sugEvents].map(e=>e.d+"|"+nrm(e.title)));
+  const weekEvents = (WEEKLY.events||[]).filter(e=>e && e.d && e.title && !seen.has(e.d+"|"+nrm(e.title)))
+      .map((e,i)=>({th:[], st:"unknown", ...e, id:"w"+i, type:e.type||"conf"}));
+  E = [...BASE_EVENTS, ...EXC_EVENTS, ...PF_EVENTS, ...sugEvents, ...weekEvents, ...USER.customEvents.map(e=>({...e, type:"conf", mine:true}))]
+      .filter(e=>VENUES[e.v] && !hidden.has(e.v)).map(e=>e.mine?e:applyPrice(e));
+  /* corrections de la veille sur les événements déjà connus : horaire, prix, places, annulation */
+  const P = WEEKLY.patch||{};
+  E = E.filter(e=>{ const x=P[ekey(e)]||{}; return !x.cancel && x.st!=="complet"; }).map(e=>{ const x=P[ekey(e)]; return x ? {...e, ...x, ...(x.price?{pc:false}:{})} : e; });
+  const hev = new Set(USER.hiddenEvents.map(x=>x.k));
+  HIDDEN_E = E.filter(e=>hev.has(ekey(e)));
+  E = E.filter(e=>!hev.has(ekey(e)));
+}
+rebuild();
+
+let artifactNS = null;
+if(window.claude && typeof window.claude.use === "function"){
+  window.claude.use("artifact").then(ns=>{ artifactNS = ns; }).catch(()=>{});
+}
+
+let saveTimer = null;
+function saveUser(msg){
+  USER.savedAt = Date.now();
+  try{ localStorage.setItem("sp-user", JSON.stringify(USER)); }catch(_){}
+  rebuild(); all(); if(S.view==="lieux") renderVenues();
+  clearTimeout(saveTimer);
+  try{ localStorage.setItem("sp-ui", JSON.stringify({view:S.view, y:window.scrollY, t:Date.now()})); }catch(_){}
+  saveTimer = setTimeout(async ()=>{
+    if(!artifactNS){ toast(msg+" · enregistré sur cet appareil"); return; }
+    const json = JSON.stringify(USER).replace(/</g,"\\u003c");
+    const html = PRISTINE.replace(/(<script id="user-data" type="application\/json">)[\s\S]*?(<\/script>)/, (_,a,b)=>a+json+b);
+    try{ await artifactNS.publish(html); toast(msg+" · enregistré"); }
+    catch(err){ toast(msg+" · enregistré sur cet appareil seulement"); }
+  }, 900);
+  toast(msg+"…");
+}
+function toast(t){ const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>el.hidden=true, 2600); }
+
+/* ---------- état de l'écran ---------- */
+const S = {types:new Set(["conf","exc","fest","expo","theatre"]), themes:new Set(), day:null, week:false, free:false, unk:false, tiers:(()=>{try{return localStorage.getItem("sp-tiers")!=="0"}catch(_){return true}})(), q:"", month:[+TODAY.slice(0,4), +TODAY.slice(5,7)-1], view:"agenda", form:null};
+let favs = new Set();
+try{ favs = new Set(JSON.parse(localStorage.getItem("sp-favs")||"[]")); }catch(_){}
+function saveFavs(){ try{ localStorage.setItem("sp-favs", JSON.stringify([...favs])); }catch(_){} }
+
+/* ---------- dates ---------- */
+const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+const JOURS = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const parse = s => { const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); };
+const iso = dt => dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+const addDays = (s,n) => { const d=parse(s); d.setDate(d.getDate()+n); return iso(d); };
+function weekend(){ const wd=parse(TODAY).getDay(); const sat=addDays(TODAY,(6-wd+7)%7); return [addDays(sat,-1), sat, addDays(sat,1)]; }
+const longDay = s => { const d=parse(s); return JOURS[d.getDay()]+" "+d.getDate()+" "+MOIS[d.getMonth()]; };
+/* Les cycles longs (plus de 3 jours) ne s'affichent qu'à leur date de début. */
+const isCycle = e => e.dEnd && (parse(e.dEnd)-parse(e.d))/864e5 > 3;
+const dow = s => parse(s).getDay();
+/* sched : horaires par jour de la semaine {0:dim … 6:sam : ["début","fin"]} */
+/* période longue sans jours connus : on ne la rattache à aucune date */
+const undated = e => !!(e.dEnd && (parse(e.dEnd)-parse(e.d))/864e5 > 3 && !e.sched && !e.daily && !e.t);
+const occurs = (e, day) => !undated(e) && day>=e.d && day<=(e.dEnd||e.d) && (!e.sched || e.sched[dow(day)]!==undefined);
+function firstOcc(e, from){ let s = e.d<from ? from : e.d; const end=e.dEnd||e.d; for(; s<=end; s=addDays(s,1)) if(occurs(e,s)) return s; return e.d; }
+function timeFor(e, day){ if(e.sched){ const x=e.sched[dow(day||firstOcc(e,TODAY))]; return x?{t:x[0]||"",end:x[1]||""}:{t:"",end:""}; } return {t:e.t||"",end:e.end||""}; }
+const JC = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+function schedLabel(e){
+  const by={}; [1,2,3,4,5,6,0].forEach(d=>{ const x=e.sched[d]; if(x){ const k=x[0].replace(":","h"); (by[k]=by[k]||[]).push(d); } });
+  return Object.entries(by).map(([h,ds])=>{ const run = ds.length>2 && ds.every((d,i)=>i===0||d===ds[i-1]+1); const lab = ds.length===1 && Object.keys(by).length===1 ? "chaque "+JOURS[ds[0]] : run ? JC[ds[0]]+"–"+JC[ds[ds.length-1]] : ds.map(d=>JC[d]).join(" "); return lab+" "+h; }).join(" · ");
+}
+const marks = (e, day) => undated(e) ? false : isCycle(e) ? day===firstOcc(e,e.d) : occurs(e, day); /* pastilles du calendrier */
+
+/* ---------- filtres ---------- */
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+/* Vos horaires : en semaine, seulement ce qui commence à partir de l'heure choisie ; le week-end, tout. */
+const isWeekend = s => { const w=parse(s).getDay(); return w===0 || w===6; };
+function fitsHours(e){
+  if(!USER.hours.on) return true;
+  const end = e.dEnd||e.d;
+  for(let s=e.d; s<=end; s=addDays(s,1)) if(isWeekend(s) && occurs(e,s)) return true;
+  if(e.eve) return true; /* journée qui se prolonge en soirée */
+  if(e.sched) return Object.entries(e.sched).some(([d,x])=>d!=="0" && d!=="6" && (!x[0] || x[0]>=USER.hours.from));
+  return !e.t || e.t >= USER.hours.from; /* horaire inconnu : on affiche plutôt que de masquer */
+}
+const stOf = e => STATUS[e.st] ? e.st : "unknown";
+const visibleStatus = e => !S.unk || e.st!=="unknown" || e.mine;
+const baseMatch = e => S.types.has(e.type) && (e.dEnd||e.d)>=TODAY && visibleStatus(e)
+  && (!S.themes.size || e.type!=="conf" || e.th.some(t=>S.themes.has(t))) /* les thèmes filtrent les conférences */ && (!S.free || e.free) && fitsHours(e) && (S.tiers || (VENUES[e.v]||{}).kind!=="tiers");
+function match(e){
+  if(!baseMatch(e)) return false;
+  if(S.day && !occurs(e,S.day)) return false;
+  if(S.week && !weekend().some(d=>occurs(e,d))) return false;
+  if(S.q){ const v=VENUES[e.v]; const hay=norm([e.title,e.who,e.desc,v.name,v.arr,...e.th.map(t=>THEMES[t].label)].join(" ")); if(!norm(S.q).split(/\s+/).every(w=>hay.includes(w))) return false; }
+  return true;
+}
+
+/* ---------- rendu ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const safeUrl = u => /^https?:\/\//i.test(u||"") ? u : "";
+
+function renderChips(){
+  $("types").innerHTML = TYPES.map(t=>`<button class="chip" data-type="${t.id}" aria-pressed="${S.types.has(t.id)}" ${t.on?"":"disabled"}>${t.label}${t.on?"":" <small>bientôt</small>"}</button>`).join("");
+  $("themes").innerHTML = Object.entries(THEMES).map(([k,t])=>`<button class="chip" data-theme="${k}" style="--c:${t.c}" aria-pressed="${S.themes.has(k)}"><span class="dot"></span>${t.label}</button>`).join("");
+}
+
+function renderCal(){
+  const [y,m] = S.month;
+  $("month").textContent = MOIS[m].replace(/^./,c=>c.toUpperCase())+" "+y;
+  const cur = +TODAY.slice(0,4)*12 + (+TODAY.slice(5,7)-1), here = y*12+m;
+  const lastD = E.reduce((a,e)=>e.d>a?e.d:a, TODAY), last = Math.max(cur+1, +lastD.slice(0,4)*12 + (+lastD.slice(5,7)-1));
+  $("prev").disabled = here<=cur;
+  $("next").disabled = here>=last;
+  const first = new Date(y,m,1), offset=(first.getDay()+6)%7, n=new Date(y,m+1,0).getDate();
+  let h = ["L","M","M","J","V","S","D"].map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let i=0;i<offset;i++) h+=`<div class="day out"></div>`;
+  for(let d=1; d<=n; d++){
+    const s = iso(new Date(y,m,d));
+    const c = E.filter(e=>baseMatch(e) && marks(e,s)).length;
+    const cls = ["day", s<TODAY?"past":"", c?"has":"", s===TODAY?"today":""].join(" ");
+    h+=`<button class="${cls}" data-day="${s}" aria-pressed="${S.day===s}" aria-label="${longDay(s)}, ${c} conférence${c>1?"s":""}">${d}<span class="n">${"<i></i>".repeat(Math.min(c,3))}</span></button>`;
+  }
+  $("grid").innerHTML = h;
+  $("q-all").setAttribute("aria-pressed", !S.day && !S.week);
+  $("q-week").setAttribute("aria-pressed", S.week);
+  $("q-free").setAttribute("aria-pressed", S.free);
+  $("q-unk").setAttribute("aria-pressed", S.unk);
+  $("q-tiers").setAttribute("aria-pressed", S.tiers);
+  $("q-hours").setAttribute("aria-pressed", USER.hours.on);
+  $("hours-from").value = USER.hours.from; $("hours-from").disabled = !USER.hours.on;
+  const nUnk = E.filter(e=>e.st==="unknown" && (e.dEnd||e.d)>=TODAY && !e.mine).length;
+  const nH = USER.hours.on ? E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && !fitsHours(e)).length : 0;
+  const nNoT = USER.hours.on ? E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && !fitsHours(e) && !e.t).length : 0;
+  const hoursTxt = nH ? ` ${nH} en journée de semaine masquée${nH>1?"s":""}.` : "";
+  $("legend").innerHTML = (S.unk ? `${nUnk} séance${nUnk>1?"s":""} aux places non vérifiées masquée${nUnk>1?"s":""}.` : `Dont ${nUnk} séance${nUnk>1?"s":""} MK2 aux places non vérifiées (étiquette en pointillés).`) + hoursTxt;
+}
+
+function gcal(e){
+  const v = VENUES[e.v]; const d0 = e.sched ? firstOcc(e,TODAY) : e.d; const ymd = d0.replace(/-/g,""); const tt = timeFor(e,d0);
+  let dates;
+  if(tt.t){ const st=tt.t.replace(":","")+"00"; const en=(tt.end||(String(+tt.t.slice(0,2)+2).padStart(2,"0")+tt.t.slice(2))).replace(":","")+"00"; dates=`${ymd}T${st}/${ymd}T${en}`; }
+  else dates=`${ymd}/${addDays(e.dEnd||e.d,1).replace(/-/g,"")}`;
+  const p = new URLSearchParams({action:"TEMPLATE", text:e.title, dates, ctz:"Europe/Paris", details:[e.who,e.desc,e.url].filter(Boolean).join("\n"), location:[e.place||v.name,e.addr||v.addr,"Paris"].filter(Boolean).join(", ")});
+  return "https://calendar.google.com/calendar/render?"+p.toString();
+}
+
+function card(e, day){
+  const v = VENUES[e.v]; const c = THEMES[e.th[0]]?.c || "#5b6478";
+  const tt = timeFor(e, typeof day==="string" ? day : null);
+  const time = tt.t ? `${tt.t.replace(":","h")}${tt.end?`<small>→ ${tt.end.replace(":","h")}</small>`:""}` : (undated(e)?`<small>date inconnue</small>`:`<small>horaire à confirmer</small>`);
+  const st = STATUS[stOf(e)];
+  const tags = [
+    isFresh(e)?`<span class="tag al-nouveau">Nouveau</span>`:"",
+    e.type==="exc"?`<span class="tag exc">★ ${esc(e.cat||"Exceptionnel")}</span>`:"",
+    TYPE_TAG[e.type]?`<span class="tag type">${TYPE_TAG[e.type]}</span>`:"",
+    e.mine?`<span class="tag mine">Ajoutée par vous</span>`:`<span class="tag ${st.cls}">${st.label}</span>`,
+    ...e.th.map(t=>`<span class="tag" style="--c:${THEMES[t].c}">${THEMES[t].label}</span>`),
+    e.free?`<span class="tag free">Gratuit</span>`:"",
+    e.sched?`<span class="tag plain">${esc(schedLabel(e))}</span>`:"",
+    isCycle(e)?`<span class="tag plain">Jusqu'au ${longDay(e.dEnd)}</span>`:""
+  ].join("");
+  const url = safeUrl(e.url);
+  const fav = favs.has(e.id);
+  return `<article class="ev" style="--c:${c}">
+    <div class="time">${time}</div>
+    <div>
+      <h3>${esc(e.title)}</h3>
+      ${e.who?`<div class="who">${esc(e.who)}</div>`:""}
+      <div class="where"><b>${esc(e.place||v.name)}</b>${(e.arr||v.arr)?`<span class="arr">${esc(e.arr||v.arr)}</span>`:""}${e.place?`<span class="arr">via ${esc(v.name)}</span>`:""}</div>
+      <div class="price"><b>Prix</b> ${esc(e.price || (e.free?"Gratuit":"Prix non communiqué"))}${e.pc?` <span class="pc">· tarif habituel du lieu, à confirmer</span>`:""}</div>
+      ${e.desc?`<p class="desc">${esc(e.desc)}</p>`:""}
+      <div class="tags">${tags}</div>
+      <div class="acts">
+        ${url?`<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">Réserver / infos</a>`:""}
+        <a class="btn" href="${esc(gcal(e))}" target="_blank" rel="noopener">+ Agenda</a>
+        <button class="btn" data-fav="${e.id}" aria-pressed="${fav}">${fav?"♥ Favori":"♡ Favori"}</button>
+        ${e.mine?`<button class="btn danger" data-delev="${e.id}">Supprimer</button>`:`<button class="btn" data-hidee="${esc(ekey(e))}">Masquer</button>`}
+      </div>
+    </div>
+  </article>`;
+}
+
+function groupList(list){
+  if(!list.length) return `<div class="empty">Aucune sortie avec ces filtres.<br>Essayez une autre date ou retirez un thème.</div>`;
+  const groups = {};
+  list.forEach(e=>{ if(undated(e)){ (groups["~"]=groups["~"]||[]).push(e); return; } let k=e.d; if(e.dEnd && e.d<TODAY) k=TODAY; if(e.sched) k=firstOcc(e,TODAY); if(S.day && occurs(e,S.day)) k=S.day; else if(S.week && e.sched){ const w=weekend().find(d=>occurs(e,d)); if(w) k=w; } (groups[k]=groups[k]||[]).push(e); });
+  return Object.keys(groups).sort().map(k=>{
+    const g = groups[k].sort((a,b)=>(timeFor(a,k).t||"99").localeCompare(timeFor(b,k).t||"99"));
+    if(k==="~") return `<div class="dayhead">Dates inconnues<em>${g.length}</em></div><p class="legend">Jours de séance pas encore trouvés : vérifie sur le site du lieu.</p><div class="list">${g.map(e=>card(e,null)).join("")}</div>`;
+    const rel = k===TODAY?"aujourd'hui":(k===addDays(TODAY,1)?"demain":"");
+    return `<div class="dayhead">${longDay(k)}${rel?`<em>${rel}</em>`:""}<em>${g.length}</em></div><div class="list">${g.map(e=>card(e,k)).join("")}</div>`;
+  }).join("");
+}
+
+function renderList(){
+  const list = E.filter(match);
+  $("count").textContent = list.length+" sortie"+(list.length>1?"s":"")+(S.day?" · "+longDay(S.day):S.week?" · ce week-end":"");
+  $("out").innerHTML = groupList(list);
+}
+
+function venueCard(id, v, n, off){
+  return `<div class="venue${off?" off":""}">
+    <h3>${esc(v.name)} ${v.arr?`<span class="arr">${esc(v.arr)}</span>`:""}</h3>
+    ${v.addr?`<p>${esc(v.addr)}</p>`:""}${v.about?`<p>${esc(v.about)}</p>`:""}
+    <div class="acts">
+      ${off ? `<button class="btn primary" data-show="${id}">Rétablir</button>`
+            : (n?`<button class="btn primary" data-venue="${id}">${n} sortie${n>1?"s":""} à venir</button>`:"")}
+      ${safeUrl(v.url)?`<a class="btn" href="${esc(v.url)}" target="_blank" rel="noopener">Site</a>`:""}
+      ${v.accepted&&!off?`<button class="btn" data-unacc="${id.slice(2)}">Annuler l'ajout</button>`:""}
+      ${off?"":(v.mine?`<button class="btn danger" data-delv="${id}">Supprimer</button>`:`<button class="btn danger" data-hide="${id}">Retirer</button>`)}
+    </div>
+  </div>`;
+}
+
+function mdToHtml(md){
+  const inl = t => esc(t).replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/(^|[\s(])(https?:\/\/[^\s)<]+)/g,(m,a,u)=>a+'<a href="'+u+'" target="_blank" rel="noopener">'+u.replace(/^https?:\/\/(www\.)?/,"")+'</a>');
+  let h="", list=false;
+  md.split("\n").forEach(L=>{
+    const close = ()=>{ if(list){ h+="</ul>"; list=false; } };
+    if(/^#{1,3} /.test(L)){ close(); const n=L.match(/^#+/)[0].length; if(n>1) h+=`<h4 class="md${n}">${inl(L.replace(/^#+ /,""))}</h4>`; }
+    else if(/^(- |\d+\. )/.test(L)){ if(!list){ h+="<ul>"; list=true; } h+=`<li>${inl(L.replace(/^(- |\d+\. )/,""))}</li>`; }
+    else if(L.trim()){ close(); h+=`<p>${inl(L)}</p>`; }
+    else close();
+  });
+  return h+(list?"</ul>":"");
+}
+function renderVeille(){
+  const n = E.filter(isFresh).length, runs = WEEKLY.runs||[];
+  const last = WEEKLY.checked ? longDay(WEEKLY.checked) : null;
+  const md = (document.getElementById("sources-md")||{}).textContent||"";
+  $("veille").innerHTML = `<div class="panel veille"><h3>Veille de la semaine</h3>
+    <p>${last?`Dernière recherche : ${last}${n?` · <b>${n} nouveauté${n>1?"s":""}</b> (étiquette « Nouveau »)`:" · rien de nouveau"}.`:`Première recherche ${longDay(addDays(TODAY,(7-parse(TODAY).getDay())%7||7))}.`} Chaque dimanche matin, Claude parcourt l'agenda de chaque lieu suivi et ajoute ce qu'il trouve.</p>
+    ${runs.length?`<p class="legend">${esc(runs[runs.length-1].note||"")}</p>`:""}
+    <details><summary>Où je cherche les événements de chaque lieu</summary><div class="mdsrc">${mdToHtml(md)}</div></details></div>`;
+}
+function renderVenues(){
+  renderVeille();
+  const counts = {};
+  E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && fitsHours(e)).forEach(e=>counts[e.v]=(counts[e.v]||0)+1);
+  const hidden = new Set(USER.hiddenVenues);
+  const ids = Object.keys(VENUES).filter(id=>!hidden.has(id));
+  const active = ids.filter(id=>counts[id]||VENUES[id].mine).sort((a,b)=>(counts[b]||0)-(counts[a]||0));
+  const watch = ids.filter(id=>!counts[id] && !VENUES[id].mine);
+  let h = active.map(id=>venueCard(id, VENUES[id], counts[id]||0, false)).join("");
+  if(watch.length) h += `<div class="section-title">À surveiller</div>` + watch.map(id=>venueCard(id, VENUES[id], 0, false)).join("");
+  const off = [...hidden].filter(id=>VENUES[id]);
+  if(HIDDEN_E.length) h += `<div class="section-title">Conférences masquées</div>` + HIDDEN_E.sort((a,b)=>a.d.localeCompare(b.d)).map(e=>`<div class="venue off"><h3>${esc(e.title)}</h3><p>${longDay(e.d)}${e.t?" · "+e.t.replace(":","h"):""} · ${esc(VENUES[e.v].name)}</p><div class="acts"><button class="btn primary" data-showe="${esc(ekey(e))}">Réafficher</button></div></div>`).join("");
+  if(off.length) h += `<div class="section-title">Lieux retirés</div>` + off.map(id=>venueCard(id, VENUES[id], 0, true)).join("");
+  $("venues").innerHTML = (active.length?`<div class="section-title">Lieux suivis</div>`:"") + h;
+  renderSugs();
+  renderForm();
+}
+
+function renderSugs(){
+  const pend = SUGGESTIONS.filter(s=>!USER.acceptedSugs.includes(s.id) && !USER.rejectedSugs.includes(s.id));
+  const rej = SUGGESTIONS.filter(s=>USER.rejectedSugs.includes(s.id));
+  let h = "";
+  const sugCard = s=>{
+      const up = s.events.filter(e=>(e.dEnd||e.d)>=TODAY).sort((a,b)=>a.d.localeCompare(b.d));
+      return `<div class="venue sug">
+        <h3>${esc(s.venue.name)} ${s.venue.arr?`<span class="arr">${esc(s.venue.arr)}</span>`:""}</h3>
+        ${s.venue.kind==="festival"?`<span class="tag exc">Festival</span>`:""}
+        <p>${esc(s.why)}</p>
+        <ul class="sugev">${up.slice(0,4).map(e=>`<li><b>${parse(e.d).getDate()} ${MOIS[parse(e.d).getMonth()].slice(0,3)}.${e.t?" "+e.t.replace(":","h"):""}</b> ${esc(e.title)} <span class="pc">· ${esc((PRICES[e.title]||{}).p || e.price || "prix non communiqué")}</span></li>`).join("")}${up.length>4?`<li>et ${up.length-4} autre${up.length-4>1?"s":""}…</li>`:""}</ul>
+        <div class="acts"><button class="btn primary" data-acc="${s.id}">${up.length?`Accepter · ${up.length} date${up.length>1?"s":""}`:"Suivre (pas encore de date)"}</button><button class="btn danger" data-rej="${s.id}">Refuser</button>${safeUrl(s.venue.url)?`<a class="btn" href="${esc(s.venue.url)}" target="_blank" rel="noopener">Site</a>`:""}</div>
+      </div>`; };
+  const pf = pend.filter(s=>s.venue.kind==="festival"), pl = pend.filter(s=>s.venue.kind!=="festival");
+  if(pf.length) h += `<div class="section-title">Festivals proposés <span class="badge">${pf.length}</span></div><div class="list">` + pf.map(sugCard).join("") + `</div>`;
+  if(pl.length) h += `<div class="section-title">Lieux proposés <span class="badge">${pl.length}</span></div><div class="list">` + pl.map(sugCard).join("") + `</div>`;
+  if(rej.length) h += `<div class="legend">Refusées : ${rej.map(s=>`<button class="btn" data-unrej="${s.id}">${esc(s.venue.name)} ↺</button>`).join(" ")}</div>`;
+  $("sugs").innerHTML = h;
+}
+
+function renderForm(){
+  const z = $("formzone");
+  if(S.form==="venue"){
+    z.innerHTML = `<form class="panel" id="f-venue">
+      <h3>Nouveau lieu</h3>
+      <div class="field"><label for="fv-name">Nom</label><input id="fv-name" required placeholder="Ex. Fondation Jean-Jaurès"></div>
+      <div class="two">
+        <div class="field"><label for="fv-arr">Arrondissement</label><input id="fv-arr" placeholder="Ex. 9e"></div>
+        <div class="field"><label for="fv-addr">Adresse</label><input id="fv-addr" placeholder="Rue…"></div>
+      </div>
+      <div class="field"><label for="fv-url">Site ou agenda</label><input id="fv-url" type="url" placeholder="https://…"></div>
+      <div class="field"><label for="fv-about">Note</label><input id="fv-about" placeholder="Ce qu'on y trouve"></div>
+      <p class="err" id="fv-err" hidden></p>
+      <div class="formacts"><button type="button" class="btn" data-cancel="1">Annuler</button><button class="btn primary" type="submit">Ajouter le lieu</button></div>
+    </form>`;
+  } else if(S.form==="event"){
+    const opts = Object.entries(VENUES).filter(([id])=>!USER.hiddenVenues.includes(id)).sort((a,b)=>a[1].name.localeCompare(b[1].name)).map(([id,v])=>`<option value="${id}">${esc(v.name)}</option>`).join("");
+    z.innerHTML = `<form class="panel" id="f-event">
+      <h3>Nouvelle conférence</h3>
+      <div class="field"><label for="fe-title">Titre</label><input id="fe-title" required></div>
+      <div class="field"><label for="fe-who">Intervenant</label><input id="fe-who"></div>
+      <div class="two">
+        <div class="field"><label for="fe-date">Date</label><input id="fe-date" type="date" required min="${TODAY}"></div>
+        <div class="field"><label for="fe-time">Heure</label><input id="fe-time" type="time"></div>
+      </div>
+      <div class="field"><label for="fe-venue">Lieu</label><select id="fe-venue" required>${opts}</select></div>
+      <div class="field"><label for="fe-theme">Thème</label><select id="fe-theme">${Object.entries(THEMES).map(([k,t])=>`<option value="${k}">${t.label}</option>`).join("")}</select></div>
+      <div class="field"><label for="fe-url">Lien de réservation</label><input id="fe-url" type="url" placeholder="https://…"></div>
+      <div class="two">
+        <div class="field"><label for="fe-price">Prix</label><input id="fe-price" placeholder="Ex. 12 €"></div>
+        <label class="check" for="fe-free"><input id="fe-free" type="checkbox"> Gratuit</label>
+      </div>
+      <p class="err" id="fe-err" hidden></p>
+      <div class="formacts"><button type="button" class="btn" data-cancel="1">Annuler</button><button class="btn primary" type="submit">Ajouter</button></div>
+    </form>`;
+  } else z.innerHTML = "";
+}
+
+function renderFavs(){
+  const list = E.filter(e=>favs.has(e.id));
+  $("favs").innerHTML = list.length ? groupList(list.sort((a,b)=>a.d.localeCompare(b.d))) : `<div class="empty">Touchez ♡ sur une conférence pour la retrouver ici.</div>`;
+  $("favn").hidden = !favs.size; $("favn").textContent = favs.size;
+  const np = SUGGESTIONS.filter(s=>!USER.acceptedSugs.includes(s.id) && !USER.rejectedSugs.includes(s.id)).length;
+  $("sugn").hidden = !np; $("sugn").textContent = np;
+}
+
+function renderRange(){
+  const up = E.filter(e=>(e.dEnd||e.d)>=TODAY && visibleStatus(e) && fitsHours(e));
+  if(!up.length){ $("range").textContent = "Aucune sortie"; return; }
+  const l = parse(up.map(e=>e.d).sort().pop());
+  $("range").textContent = `${up.length} sorties · dates jusqu'au ${l.getDate()} ${MOIS[l.getMonth()]}`;
+}
+
+function setHH(){ document.documentElement.style.setProperty("--hh", $("top").offsetHeight+"px"); }
+
+/* ---------- alertes réservations ---------- */
+const ALERTS = (()=>{ try{ return JSON.parse($("alerts-data").textContent); }catch(_){ return {artists:{}}; } })();
+const AL_LABEL = {dispo:"Places en vente", partiel:"Certaines dates complètes", complet:"Complet", nouveau:"★ Nouvelles dates"};
+function artists(){ if(!Array.isArray(USER.artists)) USER.artists = ["Fabrice Luchini"]; return USER.artists; }
+function renderAlerts(){
+  const list = artists();
+  const nNew = list.reduce((n,a)=>n+((ALERTS.artists[a]||{}).shows||[]).filter(x=>x.status==="nouveau").length,0);
+  $("aln").hidden = !nNew; $("aln").textContent = nNew;
+  if(S.view!=="alertes") return;
+  const c = ALERTS.checked ? parse(ALERTS.checked) : null;
+  $("al-info").textContent = (c?`Dernière vérification : ${c.getDate()} ${MOIS[c.getMonth()]} ${c.getFullYear()}`:"Pas encore vérifié") + (ALERTS.schedule ? ` · vérification ${ALERTS.schedule} des billetteries, avec notification dès que de nouvelles dates sont mises en vente.` : ` · plus de vérification automatique : demande à Claude de revérifier quand tu veux.`);
+  $("alerts").innerHTML = list.length ? list.map(a=>{
+    const d = ALERTS.artists[a];
+    const shows = d ? (d.shows||[]).map(x=>`<div class="alshow">
+        <h4>${esc(x.title)}</h4>
+        <div class="tags"><span class="tag al-${esc(x.status)}">${esc(AL_LABEL[x.status]||x.status)}</span></div>
+        <p><b>${esc(x.venue)}</b> · ${esc(x.period)}</p>
+        <p>${esc(x.price)}${x.note?` · ${esc(x.note)}`:""}</p>
+        ${safeUrl(x.url)?`<div class="acts"><a class="btn primary" href="${esc(x.url)}" target="_blank" rel="noopener">Billetterie</a></div>`:""}
+      </div>`).join("") : `<p class="legend">Ajouté : la vérification de demain matin cherchera ses dates.</p>`;
+    const news = d && (d.news||[]).length ? `<ul class="alnews">${d.news.slice(-3).reverse().map(n=>{const nd=parse(n.date);return `<li><b>${nd.getDate()} ${MOIS[nd.getMonth()].slice(0,3)}.</b> ${esc(n.text)}</li>`}).join("")}</ul>` : "";
+    return `<div class="venue"><h3>${esc(a)}</h3>${d&&d.watch?`<p class="legend">Suivi sur : ${esc(d.watch)}</p>`:""}${shows}${news}
+      <div class="acts"><button class="btn danger" data-unart="${esc(a)}">Ne plus suivre</button></div></div>`;
+  }).join("") : `<p class="legend">Aucun artiste suivi.</p>`;
+}
+
+function all(){ renderRange(); renderChips(); renderCal(); renderList(); renderFavs(); renderAlerts(); }
+  try{ if(WEEKLY.checked) $("checkdate").textContent = "le "+longDay(WEEKLY.checked)+" (mise à jour du dimanche)"; }catch(_){}
+
+/* ---------- interactions ---------- */
+document.addEventListener("click", ev=>{
+  const b = ev.target.closest("button"); if(!b) return;
+  const d = b.dataset;
+  if(d.type){ const t=d.type; S.types.has(t)&&S.types.size>1?S.types.delete(t):S.types.add(t); all(); }
+  else if(d.theme){ S.themes.has(d.theme)?S.themes.delete(d.theme):S.themes.add(d.theme); all(); }
+  else if(d.day){ S.day = S.day===d.day?null:d.day; S.week=false; renderCal(); renderList(); }
+  else if(d.unart){ USER.artists = artists().filter(a=>a!==d.unart); saveUser(`${d.unart} n'est plus suivi`); renderAlerts(); }
+  else if(d.fav){ favs.has(d.fav)?favs.delete(d.fav):favs.add(d.fav); saveFavs(); renderList(); renderFavs(); }
+  else if(d.venue){ const v=VENUES[d.venue]; S.q=v.name; $("q").value=v.name; S.day=null; S.week=false; switchView("agenda"); all(); }
+  else if(d.hide){ if(!USER.hiddenVenues.includes(d.hide)) USER.hiddenVenues.push(d.hide); saveUser(VENUES[d.hide].name+" retiré"); }
+  else if(d.show){ USER.hiddenVenues = USER.hiddenVenues.filter(x=>x!==d.show); saveUser(VENUES[d.show].name+" rétabli"); }
+  else if(d.delv){ const name=VENUES[d.delv].name; USER.customVenues=USER.customVenues.filter(v=>v.id!==d.delv); USER.customEvents=USER.customEvents.filter(e=>e.v!==d.delv); saveUser(name+" supprimé"); }
+  else if(d.delev){ USER.customEvents=USER.customEvents.filter(e=>e.id!==d.delev); favs.delete(d.delev); saveFavs(); saveUser("Conférence supprimée"); }
+  else if(d.hidee){ const e=E.find(x=>ekey(x)===d.hidee); USER.hiddenEvents.push({k:d.hidee}); saveUser("Conférence masquée (réaffichable dans Lieux)"); }
+  else if(d.showe){ USER.hiddenEvents=USER.hiddenEvents.filter(x=>x.k!==d.showe); saveUser("Conférence réaffichée"); }
+  else if(d.acc){ USER.acceptedSugs.push(d.acc); USER.rejectedSugs=USER.rejectedSugs.filter(x=>x!==d.acc); saveUser(SUGGESTIONS.find(s=>s.id===d.acc).venue.name+" ajouté à l'agenda"); }
+  else if(d.rej){ USER.rejectedSugs.push(d.rej); saveUser(SUGGESTIONS.find(s=>s.id===d.rej).venue.name+" refusé"); }
+  else if(d.unrej){ USER.rejectedSugs=USER.rejectedSugs.filter(x=>x!==d.unrej); saveUser("Suggestion remise en attente"); }
+  else if(d.unacc){ USER.acceptedSugs=USER.acceptedSugs.filter(x=>x!==d.unacc); saveUser("Lieu remis dans les suggestions"); }
+  else if(d.cancel){ S.form=null; renderForm(); }
+  else if(d.v){ switchView(d.v); }
+  else if(b.id==="add-venue"){ S.form = S.form==="venue"?null:"venue"; renderForm(); $("fv-name")?.focus(); }
+  else if(b.id==="add-event"){ S.form = S.form==="event"?null:"event"; renderForm(); $("fe-title")?.focus(); }
+  else if(b.id==="q-all"){ S.day=null; S.week=false; renderCal(); renderList(); }
+  else if(b.id==="q-week"){ S.week=!S.week; S.day=null; renderCal(); renderList(); }
+  else if(b.id==="q-free"){ S.free=!S.free; renderCal(); renderList(); }
+  else if(b.id==="q-unk"){ S.unk=!S.unk; all(); }
+  else if(b.id==="q-tiers"){ S.tiers=!S.tiers; try{localStorage.setItem("sp-tiers", S.tiers?"1":"0")}catch(_){} all(); }
+  else if(b.id==="q-hours"){ USER.hours.on=!USER.hours.on; saveUser(USER.hours.on?"Horaires appliqués":"Tous les horaires"); }
+  else if(b.id==="prev"){ const t=S.month[0]*12+S.month[1]-1; S.month=[Math.floor(t/12), t%12]; renderCal(); }
+  else if(b.id==="next"){ const t=S.month[0]*12+S.month[1]+1; S.month=[Math.floor(t/12), t%12]; renderCal(); }
+  else if(b.id==="reset"){ S.themes.clear(); S.day=null; S.week=false; S.free=false; S.unk=false; S.tiers=true; S.q=""; $("q").value=""; all(); }
+});
+
+document.addEventListener("submit", ev=>{
+  ev.preventDefault();
+  const f = ev.target;
+  if(f.id==="f-artist"){
+    const n=$("fa-name").value.trim(); if(!n) return;
+    if(!artists().some(a=>a.toLowerCase()===n.toLowerCase())) USER.artists.push(n);
+    $("fa-name").value=""; saveUser(`${n} est suivi`); renderAlerts(); return;
+  }
+  if(f.id==="f-venue"){
+    const name=$("fv-name").value.trim(), url=$("fv-url").value.trim();
+    const err=$("fv-err");
+    if(!name){ err.textContent="Donnez un nom au lieu."; err.hidden=false; return; }
+    if(url && !safeUrl(url)){ err.textContent="Le lien doit commencer par https://"; err.hidden=false; return; }
+    const id="u"+Date.now().toString(36);
+    USER.customVenues.push({id, name, arr:$("fv-arr").value.trim(), addr:$("fv-addr").value.trim(), url, about:$("fv-about").value.trim()});
+    S.form=null; saveUser(name+" ajouté");
+  }
+  if(f.id==="f-event"){
+    const title=$("fe-title").value.trim(), date=$("fe-date").value, url=$("fe-url").value.trim(), err=$("fe-err");
+    if(!title || !date){ err.textContent="Le titre et la date sont nécessaires."; err.hidden=false; return; }
+    if(url && !safeUrl(url)){ err.textContent="Le lien doit commencer par https://"; err.hidden=false; return; }
+    const free=$("fe-free").checked;
+    USER.customEvents.push({id:"u"+Date.now().toString(36), d:date, t:$("fe-time").value, title, who:$("fe-who").value.trim(), v:$("fe-venue").value, th:[$("fe-theme").value], url, free, price:free?"":$("fe-price").value.trim(), desc:"", st:"ok"});
+    S.form=null; saveUser("Conférence ajoutée");
+  }
+});
+$("hours-from").addEventListener("change", e=>{ if(/^\d\d:\d\d$/.test(e.target.value)){ USER.hours.from=e.target.value; saveUser("En semaine dès "+e.target.value.replace(":","h")); } });
+$("q").addEventListener("input", e=>{ S.q=e.target.value.trim(); renderList(); });
+
+function switchView(v){
+  S.view=v;
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.v===v));
+  $("view-agenda").hidden = v!=="agenda"; $("view-lieux").hidden = v!=="lieux"; $("view-favs").hidden = v!=="favs"; $("view-alertes").hidden = v!=="alertes";
+  $("note").hidden = v!=="agenda";
+  if(v==="lieux") renderVenues();
+  if(v==="favs") renderFavs();
+  if(v==="alertes") renderAlerts();
+  window.scrollTo({top:0});
+}
+
+all(); setHH();
+/* Après un enregistrement, la page peut se recharger : on revient sur le même onglet, au même endroit. */
+try{ const ui = JSON.parse(localStorage.getItem("sp-ui")||"null");
+  if(ui && Date.now()-ui.t < 120000 && ui.view && ui.view!=="agenda"){ switchView(ui.view); requestAnimationFrame(()=>window.scrollTo({top:ui.y||0})); }
+}catch(_){}
+window.addEventListener("resize", setHH);
+</script>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
+</body>
+</html>
