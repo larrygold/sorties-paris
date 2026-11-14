@@ -1345,20 +1345,34 @@ setInterval(()=>{ try{ const t=new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe
 let METEO = null;
 const WMO = c => c===0?["☀️","Grand soleil"]:c<=2?["🌤️","Plutôt ensoleillé"]:c===3?["☁️","Couvert"]:c<=48?["🌫️","Brouillard"]:c<=67?["🌧️","Pluie"]:c<=77?["❄️","Neige"]:c<=82?["🌦️","Averses"]:["⛈️","Orages"];
 async function loadMeteo(){
-  try{ const c=JSON.parse(localStorage.getItem("sp-meteo")||"null"); if(c && c.day===TODAY && Date.now()-c.at<3*3600e3){ METEO=c; renderMeteo(); return; } }catch(_){}
-  try{
-    const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=48.8566&longitude=2.3522&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,precipitation_probability_max&timezone=Europe%2FParis&forecast_days=1");
-    const j = await r.json();
-    METEO = {day:TODAY, at:Date.now(), code:j.daily.weather_code[0], tmax:Math.round(j.daily.temperature_2m_max[0]), rain:j.daily.precipitation_probability_max[0], now:Math.round(j.current.temperature_2m), codeNow:j.current.weather_code};
-    try{ localStorage.setItem("sp-meteo", JSON.stringify(METEO)); }catch(_){}
-    renderMeteo();
-  }catch(_){ /* pas de réseau : on n'affiche rien */ }
+  try{ const c=JSON.parse(localStorage.getItem("sp-meteo2")||"null"); if(c && c.day===TODAY && Date.now()-c.at<3600e3){ METEO=c; renderMeteo(); return; } }catch(_){}
+  /* Météo-France (modèle AROME, 1,5 km) via Open-Meteo ; repli sur le modèle « meilleur choix » */
+  const q = "latitude=48.8566&longitude=2.3522&current=temperature_2m,weather_code,cloud_cover,precipitation&hourly=temperature_2m,weather_code,precipitation,cloud_cover&timezone=Europe%2FParis&forecast_days=1";
+  for(const [url,src] of [["https://api.open-meteo.com/v1/meteofrance?"+q,"Météo-France"],["https://api.open-meteo.com/v1/forecast?"+q,"Open-Meteo"]]){
+    try{
+      const j = await (await fetch(url)).json();
+      if(!j.current || !j.hourly || j.current.weather_code==null) continue;
+      const H = j.hourly.time.map((t,n)=>({h:t.slice(11,16), code:j.hourly.weather_code[n], rain:j.hourly.precipitation[n]||0, temp:j.hourly.temperature_2m[n]}));
+      METEO = {day:TODAY, at:Date.now(), src, now:Math.round(j.current.temperature_2m), code:j.current.weather_code, cloud:j.current.cloud_cover, H};
+      try{ localStorage.setItem("sp-meteo2", JSON.stringify(METEO)); }catch(_){}
+      renderMeteo(); return;
+    }catch(_){}
+  }
 }
-const niceDay = m => m && m.code<=2 && (m.rain??0) < 30 && m.tmax >= 8;
+/* le reste de la journée (jusqu'à 22h) : pluie prévue ? */
+function meteoRest(m){
+  const now = nowHM().slice(0,2)+":00";
+  const rest = (m.H||[]).filter(x=>x.h>=now && x.h<="22:00");
+  const wet = rest.filter(x=>x.rain>=0.2 || (x.code>=51 && x.code<=99));
+  const tmax = Math.round(Math.max(m.now, ...rest.map(x=>x.temp)));
+  return {rest, wet, tmax, firstWet: wet[0] ? wet[0].h.replace(":00","h") : null};
+}
+const niceDay = m => { if(!m) return false; const r=meteoRest(m); return m.code<=2 && r.wet.length<=1 && r.tmax>=8; };
 function renderMeteo(){
   const box=$("meteo"); if(!box || !METEO) return;
-  const [ico,lab] = WMO(METEO.code);
-  let h = `<div class="meteo-line"><span class="ico">${ico}</span><span><b>Aujourd'hui à Paris</b> · ${lab}, ${METEO.tmax}° max${METEO.rain!=null?` · pluie ${METEO.rain} %`:""}</span></div>`;
+  const [ico,lab] = WMO(METEO.code); const r = meteoRest(METEO);
+  const later = r.wet.length ? `pluie possible vers ${r.firstWet}` : (r.rest.length ? "pas de pluie prévue d'ici ce soir" : "");
+  let h = `<div class="meteo-line"><span class="ico">${ico}</span><span><b>En ce moment à Paris</b> · ${lab}, ${METEO.now}°${later?` · ${later}`:""}<br><small class="legend">Source : ${esc(METEO.src)} (via Open-Meteo)</small></span></div>`;
   if(niceDay(METEO)){
     const today = E.filter(e=>baseMatch(e) && !undated(e) && occursFrom(e,TODAY));
     const out = today.filter(e=>e.outdoor), exc = today.filter(e=>!e.outdoor && (e.type==="exc"||e.type==="fest"));
